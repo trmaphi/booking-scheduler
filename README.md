@@ -19,8 +19,8 @@ The OpenAPI contract is the source for the TypeScript client in `src/features/bo
 ## Prerequisites
 
 - Docker with Compose v2
-- Node.js 22 or newer
-- pnpm 10.17.1 through Corepack
+- Node.js 26.10.0 or newer
+- pnpm 10.17.1
 - Go at the version declared in `api/go.mod`
 - OpenSpec CLI for strict specification validation
 

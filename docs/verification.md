@@ -6,7 +6,7 @@ This file separates the original pre-cleanup evidence from the final sanitized d
 
 - UTC date: 2026-09-29T12:32:01Z
 - Tested commit: `58b0109c6b9c5a877de7ff423e904541c0e3f57a`
-- Node.js: 25.9.0 (the Compose web image uses Node.js 22)
+- Node.js: 25.9.0 (the Compose web image now uses Node.js 26.10.0)
 - pnpm: 10.17.1
 - Go: 1.27.1 darwin/arm64 (Compose uses Go 1.27)
 - Docker Compose: 5.3.1
@@ -20,7 +20,7 @@ The evidence update and task checkbox are documentation-only changes. The comple
 
 - UTC date: 2026-09-29T11:40:09Z
 - Commit: `9d0b8d3d08c189d22b5f768b57f447d8574d00ba`
-- Node.js: 25.9.0 (the Compose web image uses Node.js 22)
+- Node.js: 25.9.0 (the Compose web image now uses Node.js 26.10.0)
 - pnpm: 10.17.1
 - Go: 1.27.1 darwin/arm64 (Compose uses Go 1.27)
 - Docker Compose: 5.3.1

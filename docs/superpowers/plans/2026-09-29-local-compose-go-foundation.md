@@ -191,7 +191,7 @@ Expected: FAIL because `web`, `api`, and `migrate` services are absent.
 
 - [ ] **Step 3: Add development Dockerfiles and Compose services**
 
-Use `golang:1.27-alpine` for API build/dev, pin Air in the image, use `node:22-alpine` plus Corepack for the web service, mount source read-write, and keep `node_modules`, `.next`, Go build cache, and Go module cache in named volumes. Do not mount the Docker socket.
+Use `golang:1.27-alpine` for API build/dev, pin Air in the image, use `node:26.10.0-alpine` with pinned pnpm for the web service, mount source read-write, and keep `node_modules`, `.next`, Go build cache, and Go module cache in named volumes. Do not mount the Docker socket.
 
 - [ ] **Step 4: Add lifecycle commands and environment examples**
 
