@@ -33,6 +33,8 @@ func NewRouter(deps Dependencies) http.Handler {
 		clock = telemetry.SystemClock()
 	}
 	mux := http.NewServeMux()
+	mux.Handle("/docs", requireMethod(http.MethodGet, http.HandlerFunc(scalarReference)))
+	mux.Handle("/openapi.yaml", requireMethod(http.MethodGet, http.HandlerFunc(openAPIContract)))
 	mux.Handle("/api/v1/health/live", requireMethod(http.MethodGet, http.HandlerFunc(live)))
 	mux.Handle("/api/v1/health/ready", requireMethod(http.MethodGet, ready(deps.Readiness)))
 	mux.Handle("/api/v1/booking-options", requireMethod(http.MethodGet, bookingOptions(deps.BookingOptions)))

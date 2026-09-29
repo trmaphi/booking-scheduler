@@ -1,7 +1,7 @@
 import { defineConfig } from "@hey-api/openapi-ts";
 
 export default defineConfig({
-  input: "./openapi/booking-api.yaml",
+  input: "./api/openapi/booking-api.yaml",
   output: {
     path: "src/features/booking/api/generated",
     postProcess: ["prettier"],

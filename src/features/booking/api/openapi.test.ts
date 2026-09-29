@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 describe("booking OpenAPI contract", () => {
   it("is a valid OpenAPI document with every booking operation", async () => {
     const api = (await SwaggerParser.validate(
-      path.resolve("openapi/booking-api.yaml"),
+      path.resolve("api/openapi/booking-api.yaml"),
     )) as unknown as {
       openapi: string;
       paths?: Record<string, unknown>;
@@ -25,7 +25,7 @@ describe("booking OpenAPI contract", () => {
 
   it("keeps booking, availability, and error examples compatible with their schemas", async () => {
     const api = (await SwaggerParser.dereference(
-      path.resolve("openapi/booking-api.yaml"),
+      path.resolve("api/openapi/booking-api.yaml"),
     )) as unknown as OpenApiDocument;
 
     const examples = [
@@ -49,7 +49,7 @@ describe("booking OpenAPI contract", () => {
 
   it("rejects non-UUID identifiers and undeclared response properties", async () => {
     const api = (await SwaggerParser.dereference(
-      path.resolve("openapi/booking-api.yaml"),
+      path.resolve("api/openapi/booking-api.yaml"),
     )) as unknown as OpenApiDocument;
     const { example, schema } = responseContent(
       api,
