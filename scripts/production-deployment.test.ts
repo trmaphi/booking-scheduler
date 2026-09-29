@@ -75,7 +75,11 @@ describe("production Compose topology", () => {
     expect(Object.keys(compose.volumes)).toEqual(
       expect.arrayContaining(["postgres-data", "caddy-data", "caddy-config"]),
     );
-    for (const service of Object.values<any>(compose.services)) {
+    for (const service of Object.values(compose.services) as Array<{
+      healthcheck?: unknown;
+      restart?: string;
+      logging: { options: Record<string, string> };
+    }>) {
       expect(service.healthcheck).toBeDefined();
       expect(service.restart).toMatch(/^(?:unless-stopped|no)$/);
       expect(service.logging.options).toMatchObject({
