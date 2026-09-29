@@ -11,6 +11,8 @@
       - app_domain is match('^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$')
       - postgres_db is defined and postgres_db | trim | length > 0
       - postgres_user is defined and postgres_user | trim | length > 0
+      - postgres_db is match('^[a-z_][a-z0-9_]{0,62}$')
+      - postgres_user is match('^[a-z_][a-z0-9_]{0,62}$')
       - postgres_password is defined and postgres_password | length > 0
       - >-
         (application_ghcr_username | length == 0 and application_ghcr_token | length == 0)

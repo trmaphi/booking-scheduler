@@ -1,7 +1,7 @@
 ANSIBLE_CONFIG := $(CURDIR)/ansible.cfg
 export ANSIBLE_CONFIG
 
-.PHONY: collections syntax lint test bootstrap bootstrap-root deploy rollback
+.PHONY: collections syntax lint test bootstrap bootstrap-root deploy rollback backup restore restore-cutover
 
 collections:
 	ansible-galaxy collection install -r requirements.yml
@@ -31,3 +31,14 @@ deploy:
 rollback:
 	@test -n "$(ROLLBACK_TAG)" || (echo "ROLLBACK_TAG is required" >&2; exit 2)
 	ansible-playbook -i inventory/production.yml playbooks/rollback.yml --ask-vault-pass --extra-vars @group_vars/production.yml --extra-vars @group_vars/production.vault.yml --extra-vars "rollback_tag=$(ROLLBACK_TAG)"
+
+backup:
+	ansible-playbook -i inventory/production.yml playbooks/backup.yml --ask-vault-pass --extra-vars @group_vars/production.yml --extra-vars @group_vars/production.vault.yml
+
+restore:
+	@test -n "$(SNAPSHOT_ID)" || (echo "SNAPSHOT_ID is required" >&2; exit 2)
+	ansible-playbook -i inventory/production.yml playbooks/restore.yml --ask-vault-pass --extra-vars @group_vars/production.yml --extra-vars @group_vars/production.vault.yml --extra-vars "restore_snapshot_id=$(SNAPSHOT_ID) confirm_restore_cutover=true"
+
+restore-cutover:
+	@test -n "$(SNAPSHOT_ID)" || (echo "SNAPSHOT_ID is required" >&2; exit 2)
+	ansible-playbook -i inventory/production.yml playbooks/restore.yml --tags restore_cutover --ask-vault-pass --extra-vars @group_vars/production.yml --extra-vars @group_vars/production.vault.yml --extra-vars "restore_snapshot_id=$(SNAPSHOT_ID) confirm_restore_cutover=true"

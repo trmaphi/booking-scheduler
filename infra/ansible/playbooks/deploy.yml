@@ -5,3 +5,5 @@
   roles:
     - role: application
       tags: [application, deploy]
+    - role: backup
+      tags: [backup]

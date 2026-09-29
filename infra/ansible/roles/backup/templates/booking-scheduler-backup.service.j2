@@ -1,0 +1,16 @@
+[Unit]
+Description=Encrypted booking scheduler PostgreSQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile={{ backup_environment_file }}
+ExecStart={{ backup_script_path }}
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={{ backup_work_root }}
+NoNewPrivileges=true

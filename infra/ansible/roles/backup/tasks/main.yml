@@ -1,0 +1,70 @@
+---
+- name: Validate backup configuration
+  ansible.builtin.assert:
+    that:
+      - r2_endpoint is defined and r2_endpoint | trim | length > 0
+      - r2_bucket is defined and r2_bucket | trim | length > 0
+      - r2_access_key_id is defined and r2_access_key_id | length > 0
+      - r2_secret_access_key is defined and r2_secret_access_key | length > 0
+      - restic_password is defined and restic_password | length > 0
+    fail_msg: R2 endpoint, bucket, credentials, and restic password are required.
+  no_log: true
+
+- name: Install distribution backup tools
+  ansible.builtin.apt:
+    name:
+      - postgresql-client-16
+      - restic
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create protected backup workspace
+  ansible.builtin.file:
+    path: "{{ backup_work_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render protected restic environment
+  ansible.builtin.template:
+    src: restic.env.j2
+    dest: "{{ backup_environment_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Render guarded PostgreSQL backup script
+  ansible.builtin.template:
+    src: backup-postgres.sh.j2
+    dest: "{{ backup_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install backup systemd service
+  ansible.builtin.template:
+    src: booking-scheduler-backup.service.j2
+    dest: "/etc/systemd/system/{{ backup_service_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install backup systemd timer
+  ansible.builtin.template:
+    src: booking-scheduler-backup.timer.j2
+    dest: "/etc/systemd/system/{{ backup_timer_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable nightly backup timer
+  ansible.builtin.systemd_service:
+    name: "{{ backup_timer_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true

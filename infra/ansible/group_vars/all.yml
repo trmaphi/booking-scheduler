@@ -3,6 +3,11 @@ application_group: deploy
 application_root: /opt/booking-scheduler
 application_config_root: /etc/booking-scheduler
 application_state_root: /var/lib/booking-scheduler
+application_project_name: booking-scheduler-prod
+application_release_root: "{{ application_root }}/releases"
+application_current_link: "{{ application_release_root }}/current"
+application_environment_file: "{{ application_config_root }}/production.env"
+application_release_state_file: "{{ application_state_root }}/active-release"
 public_tcp_ports:
   - 22
   - 80

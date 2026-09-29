@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+set -a
+source {{ backup_environment_file | quote }}
+set +a
+
+work_directory="$(mktemp -d {{ backup_work_root | quote }}/run.XXXXXX)"
+dump_path="$work_directory/booking-scheduler-postgres.dump"
+trap 'rm -rf "$work_directory"' EXIT
+
+compose=(docker compose --project-name {{ application_project_name | quote }} \
+  --env-file {{ application_environment_file | quote }} \
+  --file {{ application_current_link | quote }}/compose.production.yaml)
+
+"${compose[@]}" exec -T postgres pg_dump --format=custom --username {{ postgres_user | quote }} {{ postgres_db | quote }} > "$dump_path"
+test -s "$dump_path"
+pg_restore --list "$dump_path" >/dev/null
+
+if ! restic cat config >/dev/null 2>&1; then
+  restic init
+fi
+restic backup "$dump_path" --tag booking-scheduler-postgres
+restic forget --prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6
+restic check

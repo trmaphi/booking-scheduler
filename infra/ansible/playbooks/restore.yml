@@ -1,0 +1,139 @@
+---
+- name: Verify and optionally cut over an encrypted database restore
+  hosts: production
+  become: true
+  vars:
+    backup_environment_file: "{{ application_config_root }}/restic.env"
+    restore_candidate_database: "scheduler_restore_{{ restore_snapshot_id | default('invalid') | truncate(12, true, '') }}"
+    restore_work_directory: "{{ application_state_root }}/restore/{{ restore_snapshot_id | default('invalid') }}"
+  pre_tasks:
+    - name: Require exact snapshot and explicit cutover confirmation
+      ansible.builtin.assert:
+        that:
+          - restore_snapshot_id is defined
+          - restore_snapshot_id is match('^[a-f0-9]{8,64}$')
+          - restore_snapshot_id != 'latest'
+          - confirm_restore_cutover is defined
+          - confirm_restore_cutover | bool
+        fail_msg: An exact restore_snapshot_id and confirm_restore_cutover=true are required.
+      tags: [always]
+  tasks:
+    - name: Create protected restore workspace
+      ansible.builtin.file:
+        path: "{{ restore_work_directory }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Restore exact encrypted snapshot into workspace
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        set -a
+        source {{ backup_environment_file | quote }}
+        set +a
+        restic restore {{ restore_snapshot_id | quote }} --target {{ restore_work_directory | quote }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+
+    - name: Locate restored PostgreSQL archive
+      ansible.builtin.find:
+        paths: "{{ restore_work_directory }}"
+        patterns: booking-scheduler-postgres.dump
+        file_type: file
+        recurse: true
+      register: backup_restore_archives
+
+    - name: Require exactly one restored archive
+      ansible.builtin.assert:
+        that:
+          - backup_restore_archives.matched == 1
+
+    - name: Validate restored archive catalog with pg_restore --list
+      ansible.builtin.command:
+        argv:
+          - pg_restore
+          - --list
+          - "{{ backup_restore_archives.files[0].path }}"
+      changed_when: false
+
+    - name: Remove stale disposable restore database
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        docker compose --project-name {{ application_project_name | quote }} \
+          --env-file {{ application_environment_file | quote }} \
+          --file {{ application_current_link | quote }}/compose.production.yaml \
+          exec -T postgres dropdb --if-exists --username {{ postgres_user | quote }} {{ restore_candidate_database | quote }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+
+    - name: Create disposable restore database
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        docker compose --project-name {{ application_project_name | quote }} \
+          --env-file {{ application_environment_file | quote }} \
+          --file {{ application_current_link | quote }}/compose.production.yaml \
+          exec -T postgres createdb --username {{ postgres_user | quote }} {{ restore_candidate_database | quote }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+
+    - name: Load archive into disposable restore database
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        docker compose --project-name {{ application_project_name | quote }} \
+          --env-file {{ application_environment_file | quote }} \
+          --file {{ application_current_link | quote }}/compose.production.yaml \
+          exec -T postgres pg_restore --exit-on-error --no-owner --username {{ postgres_user | quote }} \
+          --dbname {{ restore_candidate_database | quote }} < {{ backup_restore_archives.files[0].path | quote }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+
+    - name: Probe required booking tables
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        test "$(docker compose --project-name {{ application_project_name | quote }} \
+          --env-file {{ application_environment_file | quote }} \
+          --file {{ application_current_link | quote }}/compose.production.yaml \
+          exec -T postgres psql --tuples-only --no-align --username {{ postgres_user | quote }} \
+          --dbname {{ restore_candidate_database | quote }} \
+          --command "SELECT to_regclass('public.appointments') IS NOT NULL")" = t
+      args:
+        executable: /bin/bash
+      changed_when: false
+      no_log: true
+
+    - name: Report verified restore candidate
+      ansible.builtin.debug:
+        msg: "Snapshot {{ restore_snapshot_id }} is verified in disposable database {{ restore_candidate_database }}; production is unchanged."
+
+    - name: Cut over verified restore candidate
+      ansible.builtin.shell: |
+        set -Eeuo pipefail
+        compose=(docker compose --project-name {{ application_project_name | quote }} \
+          --env-file {{ application_environment_file | quote }} \
+          --file {{ application_current_link | quote }}/compose.production.yaml)
+        "${compose[@]}" stop api web
+        "${compose[@]}" exec -T postgres psql --username {{ postgres_user | quote }} \
+          --dbname postgres --set ON_ERROR_STOP=1 <<'SQL'
+        SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE datname IN ('{{ postgres_db }}', '{{ restore_candidate_database }}')
+          AND pid <> pg_backend_pid();
+        DROP DATABASE IF EXISTS {{ postgres_db }}_before_restore WITH (FORCE);
+        ALTER DATABASE {{ postgres_db }} RENAME TO {{ postgres_db }}_before_restore;
+        ALTER DATABASE {{ restore_candidate_database }} RENAME TO {{ postgres_db }};
+        SQL
+        "${compose[@]}" up --detach --wait api web proxy
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+      tags: [never, restore_cutover]

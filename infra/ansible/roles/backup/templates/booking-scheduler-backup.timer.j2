@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly encrypted booking scheduler backup
+
+[Timer]
+OnCalendar={{ backup_on_calendar }}
+RandomizedDelaySec={{ backup_randomized_delay }}
+Persistent=true
+Unit={{ backup_service_name }}
+
+[Install]
+WantedBy=timers.target

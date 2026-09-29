@@ -2,3 +2,6 @@
 # Copy to production.vault.yml, fill locally, and encrypt with ansible-vault.
 postgres_password: ""
 application_ghcr_token: ""
+r2_access_key_id: ""
+r2_secret_access_key: ""
+restic_password: ""

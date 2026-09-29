@@ -1,0 +1,7 @@
+---
+- name: Configure and verify encrypted production backups
+  hosts: production
+  become: true
+  roles:
+    - role: backup
+      tags: [backup]

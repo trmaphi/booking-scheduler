@@ -1,0 +1,8 @@
+---
+backup_environment_file: "{{ application_config_root }}/restic.env"
+backup_script_path: /usr/local/sbin/booking-scheduler-backup
+backup_service_name: booking-scheduler-backup.service
+backup_timer_name: booking-scheduler-backup.timer
+backup_work_root: "{{ application_state_root }}/backups"
+backup_on_calendar: "*-*-* 02:00:00"
+backup_randomized_delay: 45m

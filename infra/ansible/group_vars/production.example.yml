@@ -5,3 +5,5 @@ api_image: ghcr.io/example/booking-scheduler-api
 postgres_db: scheduler
 postgres_user: scheduler
 application_ghcr_username: ""
+r2_endpoint: https://example.invalid
+r2_bucket: booking-scheduler-backups
