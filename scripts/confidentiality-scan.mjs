@@ -61,6 +61,7 @@ const providerTokens = [
   "fly.io",
   "render",
   "railway",
+  "grafana",
   "cloudflare",
   "supabase",
   "neon",
@@ -367,8 +368,13 @@ function hasProviderCommitment(pathText, text) {
     /^(?:infra\/ansible\/(?:group_vars|roles|playbooks)\/|openspec\/changes\/deploy-production-vps\/|docs\/operations\/)/i.test(
       pathText,
     );
+  const approvedMonitoringPath =
+    /^(?:infra\/ansible\/(?:playbooks\/monitoring\.yml|group_vars\/monitoring(?:\.vault)?\.example\.yml|roles\/monitoring\/)|docs\/operations\/)/i.test(
+      pathText,
+    );
   const approvedProductionProvider = (value) =>
-    approvedProductionPath && /^(?:cloudflare)$/i.test(value.trim());
+    (approvedProductionPath && /^(?:cloudflare)$/i.test(value.trim())) ||
+    (approvedMonitoringPath && /^(?:grafana)$/i.test(value.trim()));
   if (
     /(?:^|\/)(?:vercel\.json|netlify\.toml|fly\.toml|render\.ya?ml|railway\.json|serverless\.ya?ml|supabase\/config\.toml)$/i.test(
       pathText,
@@ -443,9 +449,9 @@ function hasProviderCommitment(pathText, text) {
       // Fall through to conservative text patterns.
     }
   }
-  const providerPolicyText = approvedProductionPath
+  const providerPolicyText = approvedProductionPath || approvedMonitoringPath
     ? text.replace(
-        /(^|\n)(\s*(?:provider|deploy_provider|deployment_provider|hosting_provider)\s*[:=]\s*["']?)cloudflare\b/gi,
+        /(^|\n)(\s*(?:provider|deploy_provider|deployment_provider|hosting_provider)\s*[:=]\s*["']?)(?:cloudflare|grafana)\b/gi,
         "$1$2approved-production-provider",
       )
     : text;

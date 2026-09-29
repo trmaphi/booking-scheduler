@@ -1,0 +1,25 @@
+prometheus.exporter.unix "host" {
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev"]
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  external_labels = {
+    instance    = sys.env("MONITORING_INSTANCE"),
+    environment = sys.env("MONITORING_ENVIRONMENT"),
+  }
+
+  endpoint {
+    url = sys.env("GRAFANA_PROMETHEUS_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_PROMETHEUS_USERNAME")
+      password = sys.env("GRAFANA_ACCESS_POLICY_TOKEN")
+    }
+  }
+}

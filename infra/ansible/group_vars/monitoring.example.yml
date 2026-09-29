@@ -1,0 +1,6 @@
+---
+provider: grafana
+grafana_prometheus_url: https://prometheus.example.invalid/api/prom/push
+grafana_prometheus_username: ""
+monitoring_instance: booking-scheduler-vps
+monitoring_environment: production

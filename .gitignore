@@ -23,3 +23,5 @@ test-results/
 infra/ansible/group_vars/production.yml
 infra/ansible/group_vars/production.vault.yml
 infra/ansible/.vault-password
+infra/ansible/group_vars/monitoring.yml
+infra/ansible/group_vars/monitoring.vault.yml

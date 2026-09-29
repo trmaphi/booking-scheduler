@@ -1,0 +1,4 @@
+---
+monitoring_config_path: /etc/alloy/config.alloy
+monitoring_environment_path: /etc/alloy/alloy.env
+monitoring_service_name: alloy

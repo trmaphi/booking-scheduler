@@ -1,0 +1,7 @@
+---
+- name: Configure lightweight production host monitoring
+  hosts: production
+  become: true
+  roles:
+    - role: monitoring
+      tags: [monitoring]

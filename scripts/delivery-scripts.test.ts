@@ -170,6 +170,34 @@ describe("confidentiality scanner", () => {
     expect(result.status, result.stdout).toBe(0);
   });
 
+  test("accepts approved production monitoring service", () => {
+    const cwd = repository();
+    const approvedProvider = ["gra", "fana"].join("");
+    mkdirSync(join(cwd, "infra/ansible/group_vars"), { recursive: true });
+    writeFileSync(
+      join(cwd, "infra/ansible/group_vars/monitoring.example.yml"),
+      `provider: ${approvedProvider}\n`,
+    );
+    git(cwd, "add", ".");
+
+    const result = scan(cwd);
+    expect(result.status, result.stdout).toBe(0);
+  });
+
+  test("rejects unapproved monitoring provider", () => {
+    const cwd = repository();
+    mkdirSync(join(cwd, "infra/ansible/group_vars"), { recursive: true });
+    writeFileSync(
+      join(cwd, "infra/ansible/group_vars/monitoring.example.yml"),
+      ["provider", ["data", "dog"].join("")].join(": ") + "\n",
+    );
+    git(cwd, "add", ".");
+
+    const result = scan(cwd);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("category=provider_commitment");
+  });
+
   test("rejects unapproved provider commitment", () => {
     const cwd = repository();
     writeFileSync(

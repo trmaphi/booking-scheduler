@@ -1,0 +1,113 @@
+---
+- name: Validate Grafana Cloud monitoring inputs
+  ansible.builtin.assert:
+    that:
+      - grafana_prometheus_url is defined
+      - grafana_prometheus_url is match('^https://[^/]+/api/prom/push$')
+      - grafana_prometheus_username is defined and grafana_prometheus_username | string | length > 0
+      - grafana_access_policy_token is defined and grafana_access_policy_token | length > 0
+      - monitoring_instance is defined and monitoring_instance is match('^[a-z0-9][a-z0-9._-]{0,62}$')
+      - monitoring_environment is defined and monitoring_environment is match('^[a-z0-9][a-z0-9._-]{0,62}$')
+    fail_msg: Valid Grafana Prometheus inputs and stable monitoring labels are required.
+  no_log: true
+
+- name: Create APT keyring directory for Grafana
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Grafana repository signing key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg-full.key
+    dest: /etc/apt/keyrings/grafana.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure signed Grafana APT repository
+  ansible.builtin.apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main
+    filename: grafana
+    state: present
+
+- name: Install Grafana Alloy
+  ansible.builtin.apt:
+    name: alloy
+    state: present
+    update_cache: true
+
+- name: Secure Alloy configuration directory
+  ansible.builtin.file:
+    path: /etc/alloy
+    state: directory
+    owner: root
+    group: alloy
+    mode: "0750"
+
+- name: Render protected Alloy credentials
+  ansible.builtin.template:
+    src: alloy.env.j2
+    dest: "{{ monitoring_environment_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  register: monitoring_environment_result
+  no_log: true
+
+- name: Render metrics-only Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ monitoring_config_path }}"
+    owner: root
+    group: alloy
+    mode: "0640"
+  register: monitoring_config_result
+
+- name: Create Alloy systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/alloy.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Load protected Alloy environment through systemd
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      EnvironmentFile={{ monitoring_environment_path }}
+    dest: /etc/systemd/system/alloy.service.d/10-booking-scheduler.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: monitoring_systemd_override_result
+
+- name: Validate changed Alloy configuration
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/alloy
+      - validate
+      - "{{ monitoring_config_path }}"
+  environment:
+    GRAFANA_PROMETHEUS_URL: "{{ grafana_prometheus_url }}"
+    GRAFANA_PROMETHEUS_USERNAME: "{{ grafana_prometheus_username }}"
+    GRAFANA_ACCESS_POLICY_TOKEN: "{{ grafana_access_policy_token }}"
+    MONITORING_INSTANCE: "{{ monitoring_instance }}"
+    MONITORING_ENVIRONMENT: "{{ monitoring_environment }}"
+  when: >-
+    monitoring_environment_result.changed or
+    monitoring_config_result.changed or
+    monitoring_systemd_override_result.changed
+  changed_when: true
+  no_log: true
+  notify: Restart Alloy
+
+- name: Enable and start Alloy service
+  ansible.builtin.systemd_service:
+    name: "{{ monitoring_service_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
