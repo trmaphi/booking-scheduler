@@ -1,0 +1,24 @@
+---
+- name: Bootstrap the production scheduler host
+  hosts: production
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Refuse unsupported production hosts
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version == "24.04"
+          - ansible_architecture == "x86_64"
+          - bootstrap_public_key is defined
+          - bootstrap_public_key | trim | length > 0
+        fail_msg: Production bootstrap requires Ubuntu 24.04 x86_64 and bootstrap_public_key.
+  roles:
+    - role: common
+      tags: [common]
+    - role: security
+      tags: [security]
+    - role: docker
+      tags: [docker]
+    - role: directories
+      tags: [directories]

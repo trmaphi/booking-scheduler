@@ -1,0 +1,19 @@
+---
+- name: Install baseline operating packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - fail2ban
+      - gnupg
+      - unattended-upgrades
+      - ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable unattended upgrades
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: started
+    enabled: true

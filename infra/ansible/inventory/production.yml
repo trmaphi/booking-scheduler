@@ -1,0 +1,7 @@
+all:
+  children:
+    production:
+      hosts:
+        booking-scheduler-production:
+          ansible_host: 103.188.83.18
+          ansible_user: deploy

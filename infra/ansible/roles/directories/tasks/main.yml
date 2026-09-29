@@ -1,0 +1,14 @@
+---
+- name: Create protected application directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0750"
+  loop:
+    - /opt/booking-scheduler
+    - /opt/booking-scheduler/releases
+    - /etc/booking-scheduler
+    - /var/lib/booking-scheduler
+    - /var/lib/booking-scheduler/backups

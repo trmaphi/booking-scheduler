@@ -1,0 +1,52 @@
+---
+- name: Create routine deployment group
+  ansible.builtin.group:
+    name: "{{ application_group }}"
+    state: present
+
+- name: Create locked routine deployment account
+  ansible.builtin.user:
+    name: "{{ application_user }}"
+    group: "{{ application_group }}"
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+
+- name: Install operator key before SSH hardening
+  ansible.posix.authorized_key:
+    user: "{{ application_user }}"
+    key: "{{ bootstrap_public_key }}"
+    state: present
+    exclusive: false
+
+- name: Install validated SSH hardening drop-in
+  ansible.builtin.template:
+    src: 99-booking-scheduler.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-booking-scheduler.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Restart ssh
+
+- name: Deny unsolicited inbound traffic by default
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Permit required public TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ public_tcp_ports }}"
+
+- name: Enable host firewall
+  community.general.ufw:
+    state: enabled
+
+- name: Enable Fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true

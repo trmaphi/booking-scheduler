@@ -1,0 +1,9 @@
+application_user: deploy
+application_group: deploy
+application_root: /opt/booking-scheduler
+application_config_root: /etc/booking-scheduler
+application_state_root: /var/lib/booking-scheduler
+public_tcp_ports:
+  - 22
+  - 80
+  - 443
