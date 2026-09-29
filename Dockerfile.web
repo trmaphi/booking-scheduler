@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+FROM node:26.10.0-alpine AS dependencies
+WORKDIR /app
+RUN npm install --global pnpm@10.17.1
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM dependencies AS builder
+ARG REVISION=unknown
+ARG APP_ORIGIN=https://booking-scheduler.trmaphi.work
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_API_BASE_URL=${APP_ORIGIN}
+COPY . .
+RUN mkdir -p public && pnpm build
+
+FROM node:26.10.0-alpine AS runtime
+ARG REVISION=unknown
+LABEL org.opencontainers.image.revision=$REVISION
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
+RUN addgroup -S -g 10001 scheduler && adduser -S -u 10001 -G scheduler scheduler
+WORKDIR /app
+COPY --from=builder --chown=scheduler:scheduler /app/public ./public
+COPY --from=builder --chown=scheduler:scheduler /app/.next/standalone ./
+COPY --from=builder --chown=scheduler:scheduler /app/.next/static ./.next/static
+USER scheduler
+EXPOSE 3000
+CMD ["node", "server.js"]

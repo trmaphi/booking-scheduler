@@ -7,3 +7,11 @@ api/.cache
 .env.*
 !.env.example
 *.log
+.git
+.github
+.next
+.superpowers
+node_modules
+deploy/production.env
+infra
+docs
