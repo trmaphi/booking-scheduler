@@ -1,2 +1,2 @@
 # The root api directory is a standalone Go service, not Vercel Functions.
-api
+/api
