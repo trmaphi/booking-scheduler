@@ -1,0 +1,4 @@
+---
+# Copy to production.vault.yml, fill locally, and encrypt with ansible-vault.
+postgres_password: ""
+application_ghcr_token: ""

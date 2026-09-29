@@ -53,6 +53,15 @@ class BootstrapContractTest(unittest.TestCase):
             self.assertIn(path, tasks)
         self.assertIn('mode: "0750"', tasks)
 
+    def test_deploy_account_receives_validated_automation_sudo_policy(self):
+        tasks = self.read("roles/security/tasks/main.yml")
+        self.assertIn("99-booking-scheduler-deploy", tasks)
+        self.assertIn("visudo -cf %s", tasks)
+        policy = self.read("roles/security/templates/99-booking-scheduler-deploy.j2")
+        self.assertIn("NOPASSWD", policy)
+        self.assertIn("/usr/bin/python3", policy)
+        self.assertNotIn("ALL=(ALL) NOPASSWD: ALL", policy)
+
 
 if __name__ == "__main__":
     unittest.main()

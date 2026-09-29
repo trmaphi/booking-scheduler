@@ -1,0 +1,7 @@
+---
+- name: Deploy an immutable scheduler release
+  hosts: production
+  become: true
+  roles:
+    - role: application
+      tags: [application, deploy]

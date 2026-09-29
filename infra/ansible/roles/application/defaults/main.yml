@@ -1,0 +1,9 @@
+---
+application_project_name: booking-scheduler-prod
+application_release_root: "{{ application_root }}/releases"
+application_release_dir: "{{ application_release_root }}/{{ release_tag | default('invalid') }}"
+application_current_link: "{{ application_release_root }}/current"
+application_environment_file: "{{ application_config_root }}/production.env"
+application_release_state_file: "{{ application_state_root }}/active-release"
+application_ghcr_username: ""
+application_ghcr_token: ""

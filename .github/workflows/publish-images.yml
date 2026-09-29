@@ -1,0 +1,100 @@
+name: Publish and deploy production images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the selected commit after publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm production:check
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/booking-scheduler-web:${{ github.sha }}
+          build-args: |
+            REVISION=${{ github.sha }}
+            APP_ORIGIN=https://booking-scheduler.trmaphi.work
+      - name: Build and publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: api
+          file: api/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/booking-scheduler-api:${{ github.sha }}
+          build-args: REVISION=${{ github.sha }}
+
+  deploy:
+    if: github.ref == 'refs/heads/main' || inputs.deploy == true
+    needs: verify-and-publish
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Ansible
+        run: pipx install ansible-core
+      - name: Install required collections
+        run: ansible-galaxy collection install -r infra/ansible/requirements.yml
+      - name: Prepare ephemeral deployment credentials
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          PRODUCTION_VARS_YAML: ${{ secrets.PRODUCTION_VARS_YAML }}
+          PRODUCTION_VAULT_YAML: ${{ secrets.PRODUCTION_VAULT_YAML }}
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/deploy"
+          printf '%s' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy/id_ed25519"
+          printf '%s' "$PRODUCTION_VARS_YAML" > "$RUNNER_TEMP/deploy/production.yml"
+          printf '%s' "$PRODUCTION_VAULT_YAML" > "$RUNNER_TEMP/deploy/production.vault.yml"
+          printf '%s' "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/deploy/vault-password"
+          chmod 600 "$RUNNER_TEMP/deploy/"*
+          ssh-keyscan -H 103.188.83.18 > "$RUNNER_TEMP/deploy/known_hosts"
+      - name: Deploy published commit to VPS
+        env:
+          ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+          ANSIBLE_HOST_KEY_CHECKING: "true"
+          ANSIBLE_SSH_ARGS: "-o UserKnownHostsFile=${{ runner.temp }}/deploy/known_hosts"
+        run: >-
+          ansible-playbook -i infra/ansible/inventory/production.yml
+          infra/ansible/playbooks/deploy.yml
+          --private-key "$RUNNER_TEMP/deploy/id_ed25519"
+          --vault-password-file "$RUNNER_TEMP/deploy/vault-password"
+          --extra-vars @"$RUNNER_TEMP/deploy/production.yml"
+          --extra-vars @"$RUNNER_TEMP/deploy/production.vault.yml"
+          --extra-vars release_tag=${{ github.sha }}

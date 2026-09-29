@@ -1,0 +1,17 @@
+---
+- name: Roll back to an explicit immutable scheduler release
+  hosts: production
+  become: true
+  pre_tasks:
+    - name: Require an explicit immutable rollback tag
+      ansible.builtin.assert:
+        that:
+          - rollback_tag is defined
+          - rollback_tag is match('^[a-f0-9]{40}$')
+        fail_msg: rollback_tag must be an explicit full Git commit SHA and cannot be latest.
+    - name: Select rollback release
+      ansible.builtin.set_fact:
+        release_tag: "{{ rollback_tag }}"
+  roles:
+    - role: application
+      tags: [application, rollback]

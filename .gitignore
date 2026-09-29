@@ -18,3 +18,8 @@ test-results/
 
 # Optional local additions to the built-in confidentiality detector.
 .confidentiality-patterns.local
+
+# Production Ansible values are operator-managed; examples remain tracked.
+infra/ansible/group_vars/production.yml
+infra/ansible/group_vars/production.vault.yml
+infra/ansible/.vault-password

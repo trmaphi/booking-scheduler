@@ -19,6 +19,15 @@
     state: present
     exclusive: false
 
+- name: Install validated deployment automation sudo policy
+  ansible.builtin.template:
+    src: 99-booking-scheduler-deploy.j2
+    dest: /etc/sudoers.d/99-booking-scheduler-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
 - name: Install validated SSH hardening drop-in
   ansible.builtin.template:
     src: 99-booking-scheduler.conf.j2

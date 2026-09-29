@@ -1,0 +1,203 @@
+---
+- name: Validate immutable release inputs
+  ansible.builtin.assert:
+    that:
+      - release_tag is defined
+      - release_tag is match('^[a-f0-9]{40}$')
+      - release_tag != 'latest'
+      - web_image is defined and web_image | trim | length > 0
+      - api_image is defined and api_image | trim | length > 0
+      - app_domain is defined
+      - app_domain is match('^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$')
+      - postgres_db is defined and postgres_db | trim | length > 0
+      - postgres_user is defined and postgres_user | trim | length > 0
+      - postgres_password is defined and postgres_password | length > 0
+      - >-
+        (application_ghcr_username | length == 0 and application_ghcr_token | length == 0)
+        or (application_ghcr_username | length > 0 and application_ghcr_token | length > 0)
+    fail_msg: IMAGE_TAG must be a full Git commit SHA; APP_DOMAIN must be a safe DNS hostname; all required release values must be present.
+  no_log: true
+
+- name: Create release directory
+  ansible.builtin.file:
+    path: "{{ application_release_dir }}/deploy"
+    state: directory
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0750"
+
+- name: Render protected production environment
+  ansible.builtin.template:
+    src: production.env.j2
+    dest: "{{ application_environment_file }}"
+    owner: root
+    group: "{{ application_group }}"
+    mode: "0640"
+  no_log: true
+
+- name: Render production Compose project
+  ansible.builtin.template:
+    src: compose.production.yaml.j2
+    dest: "{{ application_release_dir }}/compose.production.yaml"
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0640"
+
+- name: Render production Caddy configuration
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ application_release_dir }}/deploy/Caddyfile"
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0640"
+
+- name: Validate rendered Compose project before mutation
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - config
+      - --quiet
+  changed_when: false
+  no_log: true
+
+- name: Authenticate to GHCR
+  ansible.builtin.shell: >-
+    set -o pipefail && printf '%s' {{ application_ghcr_token | quote }} |
+    docker login ghcr.io --username {{ application_ghcr_username | quote }} --password-stdin
+  args:
+    executable: /bin/bash
+  when: application_ghcr_username | length > 0
+  changed_when: true
+  no_log: true
+
+- name: Pull immutable release images
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - pull
+  register: application_pull
+  changed_when: "'Pulled' in application_pull.stdout or 'Downloaded' in application_pull.stderr"
+  no_log: true
+
+- name: Start PostgreSQL and wait for readiness
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - up
+      - --detach
+      - --wait
+      - postgres
+  changed_when: true
+  no_log: true
+
+- name: Run database migrations
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - run
+      - --rm
+      - migrate
+  changed_when: true
+  no_log: true
+
+- name: Start production application services
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - up
+      - --detach
+      - --wait
+      - api
+      - web
+      - proxy
+  changed_when: true
+  no_log: true
+
+- name: Verify local API readiness through proxy
+  ansible.builtin.uri:
+    url: http://127.0.0.1/api/v1/health/ready
+    headers:
+      Host: "{{ app_domain }}"
+    status_code: [200, 308]
+    follow_redirects: none
+  register: application_local_api_health
+  retries: 12
+  delay: 5
+  until: application_local_api_health.status in [200, 308]
+
+- name: Verify public HTTPS web
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/"
+    status_code: 200
+    validate_certs: true
+  register: application_public_web_health
+  retries: 18
+  delay: 10
+  until: application_public_web_health.status == 200
+
+- name: Verify public HTTPS API readiness
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/api/v1/health/ready"
+    status_code: 200
+    validate_certs: true
+  register: application_public_api_health
+  retries: 12
+  delay: 5
+  until: application_public_api_health.status == 200
+
+- name: Point current release at verified release
+  ansible.builtin.file:
+    src: "{{ application_release_dir }}"
+    dest: "{{ application_current_link }}"
+    state: link
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    force: true
+
+- name: Record verified active release
+  ansible.builtin.copy:
+    content: "{{ release_tag }} {{ ansible_date_time.iso8601 }}\n"
+    dest: "{{ application_release_state_file }}"
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0640"
+
+- name: Prune dangling image layers
+  ansible.builtin.command: docker image prune --force --filter dangling=true
+  register: application_image_prune
+  changed_when: "'Total reclaimed space: 0B' not in application_image_prune.stdout"

@@ -1,0 +1,8 @@
+---
+- name: Restart production proxy
+  ansible.builtin.command: >-
+    docker compose --project-name {{ application_project_name }}
+    --env-file {{ application_environment_file }}
+    --file {{ application_current_link }}/compose.production.yaml
+    restart proxy
+  changed_when: true

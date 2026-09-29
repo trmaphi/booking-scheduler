@@ -1,0 +1,7 @@
+---
+app_domain: booking-scheduler.trmaphi.work
+web_image: ghcr.io/example/booking-scheduler-web
+api_image: ghcr.io/example/booking-scheduler-api
+postgres_db: scheduler
+postgres_user: scheduler
+application_ghcr_username: ""
