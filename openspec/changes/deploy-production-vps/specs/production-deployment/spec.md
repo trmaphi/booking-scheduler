@@ -10,6 +10,7 @@ Defines observable production deployment, recovery, and operational-safety behav
 - DNS for `booking-scheduler.trmaphi.work` is managed in Cloudflare and points to the VPS.
 - Images are published to GHCR and identified by full Git commit SHA.
 - R2 provides the S3-compatible target for an encrypted restic repository.
+- Grafana Cloud provides the Prometheus remote-write destination, Linux Server integration, and one public HTTPS synthetic check.
 
 ## ADDED Requirements
 
@@ -74,8 +75,40 @@ Restore MUST require an exact snapshot identifier, restore into a disposable dat
 - **THEN** production data remains unchanged and the verified candidate is reported
 
 ### Requirement: Provider credentials remain confidential
-Secrets, private keys, account identifiers, registry credentials, rendered environments, and Vault passwords MUST remain outside tracked files and MUST NOT appear in automation logs.
+Secrets, private keys, account identifiers, registry credentials, Grafana access-policy tokens, rendered environments, and Vault passwords MUST remain outside tracked files and MUST NOT appear in automation logs.
 
 #### Scenario: Automation renders production secrets
 - **WHEN** Ansible writes the environment or backup credential file
 - **THEN** the task suppresses secret output and applies the required restrictive file mode
+
+### Requirement: Host metrics are collected with bounded scope
+Ansible SHALL install Grafana Alloy from a signed repository, validate its configuration, enable it as a systemd service, and configure its built-in Unix exporter to remote-write CPU, memory, load, filesystem, disk I/O, and network metrics every 60 seconds with stable instance and environment labels.
+
+#### Scenario: Alloy configuration is applied
+- **WHEN** the monitoring role converges with valid Grafana Cloud inputs
+- **THEN** Alloy runs a validated metrics-only pipeline and current Linux host metrics appear in Grafana Cloud
+
+#### Scenario: Monitoring role is repeated
+- **WHEN** the monitoring role runs again with unchanged inputs
+- **THEN** it preserves the credential material and does not restart a healthy Alloy service unnecessarily
+
+### Requirement: Monitoring credentials remain protected
+The Grafana Cloud access-policy token MUST be supplied through Ansible Vault, rendered with `no_log`, stored in a root-owned file with mode `0600`, and absent from the Alloy configuration and command output.
+
+#### Scenario: Alloy credentials are rendered
+- **WHEN** Ansible writes the Grafana Cloud credential environment
+- **THEN** only root can read it and no token value is emitted or tracked
+
+### Requirement: Expensive telemetry is disabled by default
+The production monitoring configuration MUST NOT send application logs, traces, or profiles to Grafana Cloud.
+
+#### Scenario: Monitoring topology is inspected
+- **WHEN** the committed Alloy configuration is validated
+- **THEN** it contains no Loki, Tempo, OpenTelemetry trace, or Pyroscope export pipeline
+
+### Requirement: Public availability is checked independently
+Grafana Cloud Synthetic Monitoring SHALL probe `https://booking-scheduler.trmaphi.work/api/v1/health/ready` from one public location every five minutes, and the Linux Server integration SHALL alert before the root filesystem reaches 80% utilization.
+
+#### Scenario: VPS or public route is unavailable
+- **WHEN** the readiness endpoint fails from the configured public probe
+- **THEN** the synthetic check records a failure independently of Alloy running on the VPS

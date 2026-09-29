@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Provision and harden the existing Ubuntu VPS, deploy the scheduler at `booking-scheduler.trmaphi.work`, and maintain encrypted PostgreSQL backups in Cloudflare R2 through repeatable Ansible workflows.
+**Goal:** Provision and harden the existing Ubuntu VPS, deploy the scheduler at `booking-scheduler.trmaphi.work`, monitor its Linux host and public readiness through Grafana Cloud, and maintain encrypted PostgreSQL backups in Cloudflare R2 through repeatable Ansible workflows.
 
-**Architecture:** Ansible configures the existing host and renders a production Docker Compose project. Caddy terminates HTTPS and routes same-origin browser and API traffic; immutable GHCR images run Next.js and Go; PostgreSQL stays private and persists on a named volume; a systemd timer writes verified database dumps into an encrypted restic repository backed by R2.
+**Architecture:** Ansible configures the existing host, installs Grafana Alloy as a metrics-only systemd service, and renders a production Docker Compose project. Caddy terminates HTTPS and routes same-origin browser and API traffic; immutable GHCR images run Next.js and Go; PostgreSQL stays private and persists on a named volume; Alloy remote-writes 60-second Linux host metrics to Grafana Cloud; a public Grafana probe checks readiness every five minutes; and a systemd timer writes verified database dumps into an encrypted restic repository backed by R2.
 
-**Tech Stack:** Ansible Core, ansible-lint, Docker Engine, Docker Compose, Caddy 2, GitHub Container Registry, PostgreSQL 16, restic, Cloudflare DNS and R2, GitHub Actions.
+**Tech Stack:** Ansible Core, ansible-lint, Docker Engine, Docker Compose, Caddy 2, GitHub Container Registry, PostgreSQL 16, Grafana Alloy, Grafana Cloud Prometheus and Synthetic Monitoring, restic, Cloudflare DNS and R2, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-09-30-vps-production-deployment-design.md`
 
@@ -16,17 +16,19 @@
 - Public inbound ports are TCP 22, 80, and 443 only; web, API, and PostgreSQL publish no host ports.
 - Serve `booking-scheduler.trmaphi.work` over automatically renewed HTTPS with same-origin `/api/*` routing.
 - Use immutable Git commit image tags; reject `latest` as a deployment input.
-- Never commit or print passwords, private keys, Cloudflare account identifiers, R2 credentials, registry credentials, Vault passwords, or rendered production environment files.
+- Never commit or print passwords, private keys, Cloudflare account identifiers, R2 credentials, registry credentials, Grafana access-policy tokens, Vault passwords, or rendered production environment files.
 - Keep booking synchronous; do not add Kafka, Redis, a worker, Kubernetes, or another queue.
 - Retain seven daily, four weekly, and six monthly encrypted restic snapshots in R2.
 - Deployment and rollback never remove the PostgreSQL volume.
+- Grafana Alloy collects host metrics only at a 60-second interval; do not enable log, trace, or profile pipelines.
+- Grafana Cloud checks the public readiness endpoint from one location every five minutes and warns before the root filesystem reaches 80% utilization.
 - Preserve the existing application, concurrency, E2E, OpenSpec, and confidentiality checks.
 
 ## Review Focus
 
 - A missing, malformed, or `latest` release tag must stop deployment before any running container changes.
 - An unreachable database or failed migration must prevent the new API release from starting while preserving the database volume.
-- A rerun of bootstrap or deployment must converge without replacing keys, reopening ports, or restarting healthy services unnecessarily.
+- Missing or invalid Grafana Cloud inputs must stop monitoring configuration without leaking the token; a valid configuration must remain metrics-only and converge without restarting healthy Alloy unnecessarily.
 - A backup with an empty or failed `pg_dump` must never be uploaded as a successful snapshot; credentials must remain absent from logs.
 - A restore request without an explicit snapshot ID and cutover confirmation must leave production data unchanged.
 
@@ -45,7 +47,7 @@
 
 **Interfaces:**
 - Consumes: approved deployment design and existing confidentiality scanner categories.
-- Produces: strict OpenSpec requirements for host bootstrap, release, HTTPS, backups, restoration, and a scanner allowlist limited to the explicitly selected deployment services.
+- Produces: strict OpenSpec requirements for host bootstrap, release, HTTPS, monitoring, backups, restoration, and a scanner allowlist limited to the explicitly selected deployment services.
 
 - [ ] **Step 1: Write failing scanner tests for the revised policy**
 
@@ -59,7 +61,7 @@ Expected: FAIL because the current scanner rejects every provider commitment.
 
 - [ ] **Step 3: Create the OpenSpec artifacts and narrow scanner policy**
 
-Specify observable requirements and scenarios for idempotent bootstrap, locked-down networking, immutable release tags, migration ordering, HTTPS routing, encrypted R2 backups, guarded restoration, and rollback. Update `openspec/config.yaml` so the selected production topology is explicit. Change only the provider-commitment policy required by the approved design; retain all source-identity, PDF, credential, fixture, history, and unapproved-provider protections.
+Specify observable requirements and scenarios for idempotent bootstrap, locked-down networking, immutable release tags, migration ordering, HTTPS routing, metrics-only Grafana Alloy, public synthetic readiness monitoring, encrypted R2 backups, guarded restoration, and rollback. Update `openspec/config.yaml` so the selected production topology is explicit. Change only the provider-commitment policy required by the approved design; retain all source-identity, PDF, credential, fixture, history, and unapproved-provider protections.
 
 - [ ] **Step 4: Validate tests and OpenSpec**
 
@@ -176,7 +178,58 @@ git add infra/ansible
 git commit -m "feat: automate secure VPS bootstrap"
 ```
 
-### Task 4: Add deployment, health verification, and rollback automation
+### Task 4: Add lightweight Grafana Cloud host monitoring
+
+**Files:**
+- Create: `infra/ansible/playbooks/monitoring.yml`
+- Create: `infra/ansible/group_vars/monitoring.example.yml`
+- Create: `infra/ansible/group_vars/monitoring.vault.yml.example`
+- Create: `infra/ansible/roles/monitoring/defaults/main.yml`
+- Create: `infra/ansible/roles/monitoring/tasks/main.yml`
+- Create: `infra/ansible/roles/monitoring/handlers/main.yml`
+- Create: `infra/ansible/roles/monitoring/templates/config.alloy.j2`
+- Create: `infra/ansible/roles/monitoring/templates/alloy.env.j2`
+- Create: `infra/ansible/tests/monitoring_contract_test.py`
+- Modify: `infra/ansible/Makefile`
+- Modify: `scripts/confidentiality-scan.mjs`
+- Modify: `scripts/delivery-scripts.test.ts`
+
+**Interfaces:**
+- Consumes: `grafana_prometheus_url`, `grafana_prometheus_username`, Vault-backed `grafana_access_policy_token`, and stable `monitoring_instance`/`monitoring_environment` labels.
+- Produces: validated metrics-only Grafana Alloy service, 60-second Linux host metrics in Grafana Cloud, and operator commands for service/configuration/metric-freshness verification.
+
+- [ ] **Step 1: Write failing monitoring contract tests**
+
+Add tests named `test_alloy_uses_signed_repository`, `test_alloy_collects_only_approved_host_metrics_every_sixty_seconds`, `test_alloy_credentials_are_root_only_and_suppressed`, `test_alloy_configuration_is_validated_before_restart`, and `test_alloy_service_is_idempotently_enabled`. Assert the configuration contains the built-in Unix exporter, stable instance/environment labels, `scrape_interval = "60s"`, and Prometheus remote write, while excluding Loki, Tempo, OpenTelemetry trace, and Pyroscope pipelines. Extend the confidentiality scanner tests so only Grafana commitments inside the approved production-monitoring artifacts pass while arbitrary monitoring providers and credential-shaped values still fail.
+
+- [ ] **Step 2: Run tests and verify they fail**
+
+Run: `python3 -m unittest infra/ansible/tests/monitoring_contract_test.py && pnpm vitest run scripts/delivery-scripts.test.ts`
+
+Expected: FAIL because the monitoring role does not exist.
+
+- [ ] **Step 3: Implement the Grafana Alloy role and playbook**
+
+Install Alloy from Grafana's signed APT repository. Render `/etc/alloy/config.alloy` without secrets and `/etc/alloy/alloy.env` as root-owned mode `0600` under `no_log: true`. Configure the built-in Unix exporter for CPU, memory, load, filesystem, disk I/O, and network metrics only; scrape every 60 seconds; attach stable labels; and remote-write with basic authentication read from the environment. Validate configuration before notifying a restart, and start/enable the systemd service through a handler only when inputs change. Narrowly extend the approved-provider scanner policy for these monitoring artifacts without weakening credential or unapproved-provider detection.
+
+- [ ] **Step 4: Add guarded variables and operator targets**
+
+Keep endpoint, username, and stable labels in the non-secret example; keep only the access-policy token in the Vault example. Add Makefile targets for monitoring syntax, deployment, `systemctl is-active alloy`, configuration validation, and explicit Grafana metric-freshness verification without printing credentials.
+
+- [ ] **Step 5: Run monitoring verification**
+
+Run: `ANSIBLE_CONFIG=infra/ansible/ansible.cfg ansible-playbook --syntax-check -i infra/ansible/inventory/production.yml infra/ansible/playbooks/monitoring.yml && ANSIBLE_CONFIG=infra/ansible/ansible.cfg ansible-lint infra/ansible && python3 -m unittest infra/ansible/tests/monitoring_contract_test.py && pnpm vitest run scripts/delivery-scripts.test.ts && pnpm scan:confidentiality`
+
+Expected: PASS with no secret value or expensive telemetry pipeline in output.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add infra/ansible scripts/confidentiality-scan.mjs scripts/delivery-scripts.test.ts
+git commit -m "feat: add lightweight VPS monitoring"
+```
+
+### Task 5: Add deployment, health verification, and rollback automation
 
 **Files:**
 - Create: `infra/ansible/playbooks/deploy.yml`
@@ -195,7 +248,7 @@ git commit -m "feat: automate secure VPS bootstrap"
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Consumes: immutable `release_tag`, image names, domain, PostgreSQL values, optional GHCR credentials, and deployed host state from Task 3.
+- Consumes: immutable `release_tag`, image names, domain, PostgreSQL values, optional GHCR credentials, and deployed/monitored host state from Tasks 3–4.
 - Produces: verified active release under `/opt/booking-scheduler`, `/opt/booking-scheduler/releases/current`, public health assertions, and rollback to an explicitly supplied prior tag without volume deletion.
 
 - [ ] **Step 1: Write failing deployment contract tests**
@@ -229,7 +282,7 @@ git add .github .gitignore infra/ansible
 git commit -m "feat: automate immutable VPS releases"
 ```
 
-### Task 5: Add encrypted R2 backup and guarded restore automation
+### Task 6: Add encrypted R2 backup and guarded restore automation
 
 **Files:**
 - Create: `infra/ansible/playbooks/backup.yml`
@@ -279,7 +332,7 @@ git add infra/ansible
 git commit -m "feat: add encrypted database backups"
 ```
 
-### Task 6: Integrate delivery verification and operator documentation
+### Task 7: Integrate delivery verification and operator documentation
 
 **Files:**
 - Create: `docs/operations/production-deployment.md`
@@ -293,12 +346,12 @@ git commit -m "feat: add encrypted database backups"
 - Modify: `openspec/changes/deploy-production-vps/tasks.md`
 
 **Interfaces:**
-- Consumes: infrastructure checks and commands created in Tasks 1–5.
+- Consumes: infrastructure checks and commands created in Tasks 1–6.
 - Produces: `pnpm verify:infrastructure`, updated sequential delivery gate, bootstrap/deploy/rollback/backup/restore runbooks, DNS and R2 setup checklist, and checked OpenSpec completion state.
 
 - [ ] **Step 1: Write failing delivery-step tests**
 
-Assert the infrastructure verifier runs production Compose validation, production image builds, Ansible syntax, ansible-lint, Python contract tests, secret/confidentiality scans, and OpenSpec strict validation in a fixed order and stops on first failure.
+Assert the infrastructure verifier runs production Compose validation, production image builds, Ansible syntax including the monitoring playbook, ansible-lint, bootstrap/application/monitoring/backup Python contract tests, secret/confidentiality scans, and OpenSpec strict validation in a fixed order and stops on first failure.
 
 - [ ] **Step 2: Run tests and verify they fail**
 
@@ -312,7 +365,7 @@ Add `verify:infrastructure` to `package.json` and invoke it before the final con
 
 - [ ] **Step 4: Write operator and recovery documentation**
 
-Document SSH key bootstrap without placing the password in commands, Cloudflare DNS prerequisites, R2 bucket/token scope, Vault creation, GHCR visibility/authentication, first deployment, repeat deployment, rollback, backup status, snapshot listing, quarterly restore drill, firewall verification, disk monitoring, and complete VPS replacement. Mark destructive restore cutover steps clearly.
+Document SSH key bootstrap without placing the password in commands, Cloudflare DNS prerequisites, R2 bucket/token scope, Vault creation, GHCR visibility/authentication, Grafana Cloud Prometheus endpoint/instance ID/access-policy scope, metrics-only Alloy deployment and status checks, Linux Server integration dashboards/alerts, root-filesystem alert verification before 80% utilization, creation of one public HTTPS readiness check every five minutes, first deployment, repeat deployment, rollback, backup status, snapshot listing, quarterly restore drill, firewall verification, and complete VPS replacement. Mark destructive restore cutover steps clearly and keep Grafana tokens out of commands and screenshots.
 
 - [ ] **Step 5: Run the complete local release gate**
 
@@ -322,9 +375,9 @@ Expected: PASS from a clean tree and fresh local volumes.
 
 - [ ] **Step 6: Perform explicit remote bootstrap and deployment checks**
 
-Run the documented bootstrap with the operator-supplied SSH public key and interactive initial password, reconnect as `deploy`, confirm root/password SSH are disabled, deploy an immutable release, then verify HTTPS, certificate validity, health endpoints, headers, and that ports 3000, 5432, and 8080 are closed externally. Initialize R2 backup, create one snapshot, and restore it into a disposable database without cutting over production.
+Run the documented bootstrap with the operator-supplied SSH public key and interactive initial password, reconnect as `deploy`, confirm root/password SSH are disabled, configure Vault-backed Grafana credentials, deploy Alloy and an immutable application release, then verify HTTPS, certificate validity, health endpoints, headers, closed external ports 3000/5432/8080, current CPU/memory/load/filesystem/disk/network metrics in the Linux Server integration, active root-filesystem alerting before 80%, and one successful public HTTPS readiness probe configured at five-minute intervals. Initialize R2 backup, create one snapshot, and restore it into a disposable database without cutting over production.
 
-Expected: every remote assertion passes; no secret appears in console output or Git status.
+Expected: every remote and Grafana Cloud assertion passes; Alloy sends no logs, traces, or profiles; no secret appears in console output or Git status.
 
 - [ ] **Step 7: Complete OpenSpec tasks and commit**
 
@@ -338,4 +391,3 @@ git commit -m "docs: add production operations runbook"
 Run: `git push origin main`
 
 Expected: remote `main` contains the verified infrastructure commits.
-

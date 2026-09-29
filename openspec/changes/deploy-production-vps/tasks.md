@@ -16,18 +16,23 @@
 - [ ] 3.1 Add idempotent Ansible roles for common packages, SSH/firewall security, Docker, and protected directories.
 - [ ] 3.2 Verify platform guards, key-first hardening, Docker repository pinning, and rerun behavior.
 
-## 4. Release and rollback
+## 4. Host monitoring
 
-- [ ] 4.1 Publish SHA-tagged x86_64 images to GHCR from a least-privilege workflow.
-- [ ] 4.2 Add validated deploy and rollback playbooks with migration and public-health gates.
+- [ ] 4.1 Add a metrics-only Grafana Alloy role with signed package installation, 60-second Unix host metrics, Vault-backed credentials, configuration validation, and idempotent systemd management.
+- [ ] 4.2 Verify Grafana credential secrecy, root-only file modes, stable labels, allowed metric collectors, and absence of log, trace, and profile pipelines.
 
-## 5. Backup and restore
+## 5. Release and rollback
 
-- [ ] 5.1 Add encrypted R2 backups, retention, cleanup, repository checks, and a systemd timer.
-- [ ] 5.2 Add disposable restore verification and separately confirmed cutover.
+- [ ] 5.1 Publish SHA-tagged x86_64 images to GHCR from a least-privilege workflow.
+- [ ] 5.2 Add validated deploy and rollback playbooks with migration and public-health gates.
 
-## 6. Delivery and operations
+## 6. Backup and restore
 
-- [ ] 6.1 Integrate infrastructure verification into the sequential delivery gate.
-- [ ] 6.2 Document bootstrap, deployment, rollback, backup, restore drill, monitoring, and VPS replacement.
-- [ ] 6.3 Verify the live production deployment, off-host snapshot, and disposable restore.
+- [ ] 6.1 Add encrypted R2 backups, retention, cleanup, repository checks, and a systemd timer.
+- [ ] 6.2 Add disposable restore verification and separately confirmed cutover.
+
+## 7. Delivery and operations
+
+- [ ] 7.1 Integrate infrastructure verification into the sequential delivery gate.
+- [ ] 7.2 Document bootstrap, deployment, rollback, backup, restore drill, Alloy status/metric freshness, disk alerting, the five-minute HTTPS synthetic check, and VPS replacement.
+- [ ] 7.3 Verify the live production deployment, fresh Linux host metrics, active disk alerting, successful public synthetic check, off-host snapshot, and disposable restore.

@@ -130,7 +130,13 @@ The Go API continues emitting privacy-safe JSON logs to standard output. Docker 
 
 Compose defines restart policies, health checks, and conservative memory limits. PostgreSQL receives the largest memory allowance; the Go API remains small; Next.js has enough headroom for runtime operation because builds happen outside the VPS. Disk monitoring must alert before the root filesystem reaches 80% utilization.
 
-No log aggregation service is introduced in this change. A future collector can ship the existing structured events without changing application logging.
+Ansible installs Grafana Alloy directly on the VPS from Grafana's signed APT repository and manages it as a systemd service. Alloy uses its built-in Unix exporter to collect only host CPU, memory, load, filesystem, disk I/O, and network metrics. It scrapes every 60 seconds and remote-writes to the Grafana Cloud Prometheus endpoint. Each server is identified with stable instance and environment labels so the Linux Server integration dashboards and alert rules remain useful after reprovisioning.
+
+The Grafana Cloud metrics URL and instance ID are ordinary production variables; the access-policy token is supplied through Ansible Vault. Ansible renders the token only into a root-owned `0600` environment file with `no_log: true`; the Alloy configuration references the environment rather than embedding the token. Logs, traces, and profiling are disabled. No Loki, Tempo, or Pyroscope pipeline is introduced in this change.
+
+The Linux Server integration provides the initial host dashboards and alert rules. The operator verifies that disk utilization alerting fires before the root filesystem reaches 80% utilization. A separate Grafana Cloud Synthetic Monitoring HTTPS check probes `https://booking-scheduler.trmaphi.work/api/v1/health/ready` from one public location every five minutes. The synthetic check is a cloud-side prerequisite and is not executed by Alloy on the VPS.
+
+No log aggregation service is introduced in this change. The existing structured events remain local and bounded; a future collector can ship selected events without changing application logging.
 
 ## Failure handling and rollback
 
@@ -151,7 +157,9 @@ Repository checks must cover:
 - Multi-stage image builds for x86_64.
 - A clean-volume local production smoke test covering migrations, API readiness, web rendering, and same-origin API routing through Caddy.
 - A second Ansible check-mode/idempotence run with no unexpected changes.
+- Alloy package-signing, configuration validation, systemd enablement, metrics-only pipeline, 60-second scrape interval, and root-only credential-file checks.
 - Remote verification of HTTPS, certificate validity, security headers, application health, and closed application/database ports.
+- Grafana Cloud verification that the VPS reports current Linux host metrics, the root-filesystem alert rule is active, and the five-minute public HTTPS synthetic check succeeds.
 - Backup creation, repository check, snapshot listing, and a restore into a disposable database.
 
 The existing application unit, integration, concurrency, E2E, OpenSpec, and confidentiality checks remain required. The confidentiality policy must be revised narrowly so the explicitly selected deployment services are allowed while source-identifying content, PDFs, credentials, real-looking fixtures, and unapproved provider commitments remain rejected.
@@ -161,7 +169,6 @@ The existing application unit, integration, concurrency, E2E, OpenSpec, and conf
 - Automated Cloudflare DNS record management; DNS remains an operator prerequisite.
 - Multi-VPS availability and database replication.
 - Kafka, Redis, background workers, and notification delivery.
-- Centralized log aggregation and alert delivery.
+- Centralized log aggregation and application-log alerting.
 - Automated VPS provisioning through a hosting-provider API.
 - Zero-downtime database schema rollback.
-
