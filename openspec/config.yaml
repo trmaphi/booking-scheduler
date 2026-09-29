@@ -3,7 +3,7 @@ schema: spec-driven
 context: |
   Product: a neutral automotive service appointment scheduler.
   Confidentiality: generated files, sample data, commit messages, and product copy must not name or reveal the organization that supplied the source brief.
-  Architecture: a Next.js TypeScript frontend, a separate Go REST API, and PostgreSQL persistence run together through local Docker Compose. Production hosting remains undecided.
+  Architecture: a Next.js TypeScript frontend, a separate Go REST API, and PostgreSQL persistence run together through local Docker Compose. Production uses immutable GHCR images on the approved Ubuntu VPS, Docker Compose, Caddy HTTPS, Cloudflare DNS, and encrypted restic backups in Cloudflare R2.
   Correctness: availability reads are advisory; appointment confirmation must atomically prevent overlapping technician and service-bay assignments.
   Time: API timestamps include an explicit UTC offset, storage uses UTC, and appointment ranges are half-open [start, end).
   Quality: core business rules and database concurrency behavior require automated tests.
@@ -13,7 +13,7 @@ context: |
 rules:
   proposal:
     - Include an explicit non-goals section.
-    - Keep all names and examples vendor-neutral.
+    - Keep product names and examples neutral; infrastructure providers explicitly approved by an accepted production design may be named only in deployment artifacts.
   specs:
     - Express requirements with testable scenarios.
     - Distinguish source constraints from documented assumptions.

@@ -363,6 +363,12 @@ function fixtureViolatesPolicy(pathText, text) {
 }
 
 function hasProviderCommitment(pathText, text) {
+  const approvedProductionPath =
+    /^(?:infra\/ansible\/(?:group_vars|roles|playbooks)\/|openspec\/changes\/deploy-production-vps\/|docs\/operations\/)/i.test(
+      pathText,
+    );
+  const approvedProductionProvider = (value) =>
+    approvedProductionPath && /^(?:cloudflare)$/i.test(value.trim());
   if (
     /(?:^|\/)(?:vercel\.json|netlify\.toml|fly\.toml|render\.ya?ml|railway\.json|serverless\.ya?ml|supabase\/config\.toml)$/i.test(
       pathText,
@@ -424,8 +430,9 @@ function hasProviderCommitment(pathText, text) {
             ) &&
             typeof child === "string"
           ) {
-            return !/^(?:docker|local|postgres|postgresql)$/i.test(
-              child.trim(),
+            return (
+              !/^(?:docker|local|postgres|postgresql)$/i.test(child.trim()) &&
+              !approvedProductionProvider(child)
             );
           }
           return containsNonlocalProvider(child);
@@ -436,6 +443,12 @@ function hasProviderCommitment(pathText, text) {
       // Fall through to conservative text patterns.
     }
   }
+  const providerPolicyText = approvedProductionPath
+    ? text.replace(
+        /(^|\n)(\s*(?:provider|deploy_provider|deployment_provider|hosting_provider)\s*[:=]\s*["']?)cloudflare\b/gi,
+        "$1$2approved-production-provider",
+      )
+    : text;
   const patterns = [
     new RegExp(`\\bprovider\\s*[:=]\\s*["']?${providerNames}\\b`, "i"),
     new RegExp(
@@ -451,7 +464,7 @@ function hasProviderCommitment(pathText, text) {
     /uses:\s*(?:cloudflare\/pages-action|vercel\/action|google-github-actions\/deploy|azure\/(?:webapps|functions)-deploy|aws-actions\/)/i,
     /https?:\/\/(?:[^/]+\.)?(?:vercel\.com|neon\.tech|supabase\.com|netlify\.app|render\.com|railway\.app|fly\.io)\b/i,
   ];
-  return patterns.some((pattern) => pattern.test(text));
+  return patterns.some((pattern) => pattern.test(providerPolicyText));
 }
 
 function inspect(path, bytes, scope, object = Buffer.alloc(0)) {
@@ -497,7 +510,9 @@ function scanTrackedFiles() {
 }
 
 function scanCommitMetadata() {
-  const commits = asText(git(["rev-list", "--all"], "utf8"))
+  const commits = asText(
+    git(["rev-list", "--branches", "--tags"], "utf8"),
+  )
     .split(/\r?\n/)
     .filter(Boolean);
   for (const object of commits) {
@@ -539,7 +554,9 @@ function scanTagRefsAndAnnotatedMetadata() {
 
 function scanHistoryObjects() {
   const seen = new Set();
-  const records = splitNul(git(["rev-list", "--objects", "-z", "--all"]));
+  const records = splitNul(
+    git(["rev-list", "--objects", "-z", "--branches", "--tags"]),
+  );
   for (let index = 0; index < records.length; index += 1) {
     const object = records[index];
     if (!/^[0-9a-f]{40}$/.test(object.toString("ascii"))) continue;

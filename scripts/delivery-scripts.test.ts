@@ -138,6 +138,68 @@ describe("confidentiality scanner", () => {
     expect(result.stdout).toContain("Confidentiality scan passed");
   });
 
+  test("accepts approved production deployment services", () => {
+    const cwd = repository();
+    const approvedProvider = ["cloud", "flare"].join("");
+    mkdirSync(join(cwd, ".github/workflows"), { recursive: true });
+    mkdirSync(join(cwd, "infra/ansible/group_vars"), { recursive: true });
+    writeFileSync(
+      join(cwd, ".github/workflows/publish-images.yml"),
+      [
+        "name: publish images",
+        "jobs:",
+        "  publish:",
+        "    steps:",
+        "      - uses: docker/login-action@v3",
+        "        with:",
+        "          registry: ghcr.io",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "infra/ansible/group_vars/production.example.yml"),
+      [
+        `provider: ${approvedProvider}`,
+        "backup_endpoint: https://account.example.invalid",
+        "backup_backend: r2",
+        "certificate_proxy: caddy",
+      ].join("\n"),
+    );
+    git(cwd, "add", ".");
+
+    const result = scan(cwd);
+    expect(result.status, result.stdout).toBe(0);
+  });
+
+  test("rejects unapproved provider commitment", () => {
+    const cwd = repository();
+    writeFileSync(
+      join(cwd, "deploy.yaml"),
+      ["provider", ["acme", "cloud"].join("")].join(": ") + "\n",
+    );
+    git(cwd, "add", ".");
+
+    const result = scan(cwd);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("category=provider_commitment");
+  });
+
+  test("still rejects provider credentials", () => {
+    const cwd = repository();
+    const fakeSecret = ["FAKE", "SECRET", "MARKER", "1234567890"].join(
+      "_",
+    );
+    writeFileSync(
+      join(cwd, "deploy.env"),
+      `token=${fakeSecret}\n`,
+    );
+    git(cwd, "add", ".");
+
+    const result = scan(cwd);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("category=credential");
+    expect(result.stdout).not.toContain(fakeSecret);
+  });
+
   test("rejects a configured non-reversible prohibited-term digest", () => {
     const cwd = repository();
     writeFileSync(join(cwd, "notes.txt"), `${prohibitedSentinel}\n`);
