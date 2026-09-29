@@ -1,0 +1,9 @@
+.agents/
+.superpowers/
+.next/
+coverage/
+docs/superpowers/plans/
+node_modules/
+.pnpm-store/
+openspec/
+pnpm-lock.yaml

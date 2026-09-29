@@ -1,0 +1,36 @@
+services:
+  smoke:
+    image: alpine:3.22
+    depends_on:
+      web:
+        condition: service_healthy
+    command:
+      - sh
+      - -ec
+      - |
+        wget -qO- http://api:8080/api/v1/health/live | grep -q '"status":"ok"'
+        wget -qO- http://api:8080/api/v1/health/ready | grep -q '"status":"ok"'
+        wget -qO- http://web:3000/ | grep -q 'Book your next service with confidence.'
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.63.0-noble
+    profiles: ["test"]
+    working_dir: /work
+    environment:
+      E2E_WEB_BASE_URL: http://localhost:3000
+      E2E_API_BASE_URL: http://localhost:8080
+      E2E_OUTPUT_DIR: /test-results
+      E2E_REQUIRE_CLEAN_ARTIFACT: ${E2E_REQUIRE_CLEAN_ARTIFACT:-0}
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    command: ["node", "e2e/run.mjs"]
+    volumes:
+      - ./:/work:ro
+      - web-modules:/work/node_modules:ro
+      - e2e-results:/test-results
+
+volumes:
+  e2e-results:

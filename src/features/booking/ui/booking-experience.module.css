@@ -1,0 +1,425 @@
+.bookingCard,
+.confirmed {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(22, 46, 41, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 24px 70px rgba(18, 52, 45, 0.12);
+  overflow: hidden;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #eef4f1;
+  border-bottom: 1px solid #dce8e2;
+}
+
+.steps li {
+  align-items: center;
+  color: #6b7d76;
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: 700;
+  gap: 0.55rem;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  padding: 1rem 0.5rem;
+  text-transform: uppercase;
+}
+
+.steps span {
+  align-items: center;
+  border: 1px solid #9fb3aa;
+  border-radius: 50%;
+  display: inline-flex;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.steps .stepActive {
+  color: #123f36;
+}
+.steps .stepActive span {
+  background: #123f36;
+  border-color: #123f36;
+  color: white;
+}
+
+.cardHeader {
+  padding: 2.25rem 2.5rem 1.25rem;
+}
+.cardHeader h2,
+.confirmed h2 {
+  color: #102e29;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  letter-spacing: -0.04em;
+  margin: 0.3rem 0 0.55rem;
+}
+.cardHeader p:not(.eyebrow),
+.confirmedLead {
+  color: #62716d;
+  line-height: 1.6;
+  margin: 0;
+}
+.eyebrow {
+  color: #b4562a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.formGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 1rem 2.5rem 1.5rem;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 0.45rem;
+}
+.formGrid label > span {
+  color: #334943;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.formGrid select,
+.formGrid input {
+  appearance: none;
+  background: #f8faf9;
+  border: 1px solid #cfddd7;
+  border-radius: 12px;
+  color: #173c34;
+  font: inherit;
+  min-height: 50px;
+  padding: 0 0.9rem;
+  width: 100%;
+}
+.formGrid select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, #49635b 50%),
+    linear-gradient(135deg, #49635b 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 21px,
+    calc(100% - 13px) 21px;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  padding-right: 2.5rem;
+}
+.formGrid select:focus,
+.formGrid input:focus,
+.timeGrid label:has(input:focus-visible) {
+  border-color: #b4562a;
+  box-shadow: 0 0 0 3px rgba(180, 86, 42, 0.13);
+  outline: none;
+}
+
+.actions {
+  align-items: center;
+  border-top: 1px solid #e2ebe7;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.4rem 2.5rem 1.7rem;
+}
+.primaryButton,
+.secondaryButton,
+.textButton {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 48px;
+  padding: 0 1.35rem;
+}
+.primaryButton {
+  background: #163f36;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(22, 63, 54, 0.2);
+}
+.primaryButton:hover {
+  background: #0c2f28;
+  transform: translateY(-1px);
+}
+.primaryButton:disabled {
+  background: #aab8b3;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+.secondaryButton {
+  background: #e5efeb;
+  color: #153d34;
+  margin-top: 2rem;
+}
+.textButton {
+  background: transparent;
+  color: #38534c;
+}
+.hint {
+  color: #74827e;
+  font-size: 0.8rem;
+}
+
+.timesSection,
+.review {
+  padding-top: 0.5rem;
+}
+.sectionTitle {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 2.5rem;
+}
+.sectionTitle h3 {
+  color: #173a32;
+  font-size: 1.2rem;
+  margin: 0.25rem 0 0;
+}
+.duration {
+  background: #f5e8df;
+  border-radius: 999px;
+  color: #9a4722;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.5rem 0.75rem;
+}
+.timeGrid {
+  border: 0;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0.75rem 2.5rem 1.75rem;
+}
+.timeGrid label {
+  align-items: center;
+  background: #f6f9f7;
+  border: 1px solid #d7e2dd;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 0.5rem;
+}
+.timeGrid label:hover,
+.timeGrid .timeSelected {
+  background: #163f36;
+  border-color: #163f36;
+  color: white;
+}
+.timeGrid input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+.timeGrid strong {
+  font-size: 1.05rem;
+}
+.timeGrid small {
+  color: #73827d;
+  margin-top: 0.18rem;
+}
+.timeGrid .timeSelected small,
+.timeGrid label:hover small {
+  color: #c9dad3;
+}
+
+.reviewRows {
+  display: grid;
+  gap: 0;
+  grid-template-columns: 1fr 1fr;
+  margin: 0.75rem 2.5rem 1.25rem;
+  border: 1px solid #dbe6e1;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.reviewRows > div {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 112px;
+  padding: 1.15rem 1.25rem;
+}
+.reviewRows > div:nth-child(odd) {
+  border-right: 1px solid #dbe6e1;
+}
+.reviewRows > div:nth-child(-n + 2) {
+  border-bottom: 1px solid #dbe6e1;
+}
+.reviewRows span,
+.confirmedGrid span {
+  color: #7b8984;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.reviewRows strong,
+.confirmedGrid strong {
+  color: #173a32;
+}
+.reviewRows small,
+.confirmedGrid small {
+  color: #70807b;
+  line-height: 1.45;
+}
+.assignmentNote {
+  align-items: center;
+  background: #eef5f2;
+  border-radius: 14px;
+  color: #34564d;
+  display: flex;
+  font-size: 0.82rem;
+  gap: 0.65rem;
+  margin: 0 2.5rem 1.5rem;
+  padding: 0.85rem 1rem;
+}
+.assignmentNote span {
+  align-items: center;
+  background: #fff;
+  border-radius: 50%;
+  display: inline-flex;
+  font-family: serif;
+  font-weight: 800;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.loading {
+  align-items: center;
+  color: #526861;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  min-height: 180px;
+  padding: 2rem;
+}
+.loading span {
+  animation: pulse 1s infinite alternate;
+  background: #b4562a;
+  border-radius: 50%;
+  height: 10px;
+  width: 10px;
+}
+.error {
+  background: #fff0eb;
+  border: 1px solid #efc7b6;
+  border-radius: 12px;
+  color: #8e3f22;
+  margin: 0.75rem 2.5rem;
+  padding: 0.85rem 1rem;
+}
+.emptyState {
+  background: #f6f9f7;
+  border: 1px dashed #bdcec7;
+  border-radius: 16px;
+  color: #405a53;
+  margin: 0.75rem 2.5rem 1.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+.emptyState p {
+  color: #77847f;
+  margin: 0.35rem 0 0;
+}
+
+.confirmed {
+  padding: 3rem;
+  text-align: center;
+}
+.successMark {
+  align-items: center;
+  background: #163f36;
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  font-size: 2rem;
+  height: 64px;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  width: 64px;
+}
+.confirmedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 2.2rem;
+  text-align: left;
+  border: 1px solid #dbe6e1;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.confirmedGrid > div {
+  display: grid;
+  gap: 0.3rem;
+  min-height: 120px;
+  padding: 1.15rem;
+  border-right: 1px solid #dbe6e1;
+  border-bottom: 1px solid #dbe6e1;
+}
+.confirmedGrid > div:nth-child(3n) {
+  border-right: 0;
+}
+.confirmedGrid > div:nth-child(n + 4) {
+  border-bottom: 0;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+
+@media (max-width: 720px) {
+  .cardHeader,
+  .formGrid,
+  .sectionTitle {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+  .formGrid,
+  .reviewRows,
+  .confirmedGrid {
+    grid-template-columns: 1fr;
+  }
+  .timeGrid {
+    grid-template-columns: repeat(2, 1fr);
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+  .actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+  .reviewRows,
+  .assignmentNote {
+    margin-left: 1.25rem;
+    margin-right: 1.25rem;
+  }
+  .reviewRows > div,
+  .confirmedGrid > div {
+    border-bottom: 1px solid #dbe6e1;
+    border-right: 0 !important;
+  }
+  .confirmedGrid > div:last-child {
+    border-bottom: 0;
+  }
+  .confirmed {
+    padding: 2rem 1.25rem;
+  }
+  .steps li {
+    font-size: 0.64rem;
+  }
+}

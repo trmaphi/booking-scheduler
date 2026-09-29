@@ -1,0 +1,27 @@
+{
+  "fixtureNames": [
+    "Jordan Lee",
+    "Archived Customer",
+    "Riverside Service Centre",
+    "Archived Service Centre",
+    "Silver Hatchback",
+    "Archived Saloon",
+    "Routine Maintenance",
+    "Diagnostic Inspection",
+    "Archived Skill",
+    "Routine Inspection",
+    "Comprehensive Service",
+    "Archived Service",
+    "Taylor Morgan",
+    "Avery Chen",
+    "Robin Quinn",
+    "Archived Technician",
+    "Bay A",
+    "Bay B",
+    "Archived Bay"
+  ],
+  "fixtureAddresses": ["100 Riverside Way", "200 Archive Road"],
+  "fixtureRegistrations": ["DEMO-001", "DEMO-002"],
+  "fixtureEmailDomains": ["example.invalid"],
+  "fixturePhoneNumbers": ["+1 202-555-0100"]
+}

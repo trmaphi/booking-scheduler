@@ -1,0 +1,409 @@
+openapi: 3.1.0
+info:
+  title: Service Booking API
+  version: 1.0.0
+  description: Contract for discovering and confirming resource-constrained service appointments.
+servers:
+  - url: /
+paths:
+  /api/v1/booking-options:
+    get:
+      operationId: getBookingOptions
+      summary: Return active reference data for a booking request
+      responses:
+        "200":
+          description: Active vehicles, service centres and service types
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingOptions"
+              example:
+                vehicles:
+                  - id: 10000000-0000-0000-0000-000000000012
+                    customerId: 10000000-0000-0000-0000-000000000011
+                    label: Blue hatchback
+                    registration: DEMO 101
+                dealerships:
+                  - id: 20000000-0000-0000-0000-000000000021
+                    name: Riverside Service Centre
+                    address: 100 Riverside Way
+                    timezone: Europe/London
+                serviceTypes:
+                  - id: 30000000-0000-0000-0000-000000000031
+                    name: Annual service
+                    description: Routine inspection
+                    durationMinutes: 60
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+  /api/v1/availability:
+    get:
+      operationId: getAvailability
+      summary: Return start times with a complete qualified resource pair
+      parameters:
+        - $ref: "#/components/parameters/VehicleId"
+        - $ref: "#/components/parameters/DealershipId"
+        - $ref: "#/components/parameters/ServiceTypeId"
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Available appointment intervals
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [slots]
+                properties:
+                  slots:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AvailabilitySlot"
+              example:
+                slots:
+                  - startAt: "2027-09-29T08:00:00Z"
+                    endAt: "2027-09-29T09:00:00Z"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/v1/appointments:
+    post:
+      operationId: confirmAppointment
+      summary: Atomically allocate resources and confirm an appointment
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+            pattern: "^[!-~]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmAppointmentRequest"
+      responses:
+        "201":
+          description: Appointment confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+              example: &appointmentExample
+                id: 40000000-0000-4000-8000-000000000001
+                status: CONFIRMED
+                vehicle:
+                  id: 20000000-0000-0000-0000-000000000011
+                  customerId: 20000000-0000-0000-0000-000000000001
+                  label: Silver Hatchback
+                  registration: DEMO-001
+                dealership:
+                  id: 20000000-0000-0000-0000-000000000021
+                  name: Riverside Service Centre
+                  address: 100 Riverside Way
+                  timezone: Europe/London
+                serviceType:
+                  id: 20000000-0000-0000-0000-000000000041
+                  name: Routine Inspection
+                  description: A standard safety and maintenance inspection.
+                  durationMinutes: 60
+                technician:
+                  id: 20000000-0000-0000-0000-000000000051
+                  name: Taylor Morgan
+                serviceBay:
+                  id: 20000000-0000-0000-0000-000000000061
+                  name: Bay A
+                startAt: "2031-03-04T09:30:00Z"
+                endAt: "2031-03-04T10:30:00Z"
+        "200":
+          description: Original appointment returned for an identical idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+              example: *appointmentExample
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          description: The requested interval or idempotency key conflicts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                code: RESOURCE_CONFLICT
+                message: the requested appointment is no longer available
+                requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/v1/appointments/{appointmentId}:
+    get:
+      operationId: getAppointment
+      summary: Return a persisted confirmed appointment
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Identifier"
+      responses:
+        "200":
+          description: Confirmed appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+              example: *appointmentExample
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                code: NOT_FOUND
+                message: appointment not found
+                requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/v1/health/live:
+    get:
+      operationId: getLiveness
+      summary: Confirm that the API process is responsive
+      responses:
+        "200":
+          description: API process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/health/ready:
+    get:
+      operationId: getReadiness
+      summary: Confirm that the API can serve database-backed traffic
+      responses:
+        "200":
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: A required dependency is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                code: NOT_READY
+                message: service unavailable
+                requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+components:
+  parameters:
+    VehicleId:
+      name: vehicleId
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    DealershipId:
+      name: dealershipId
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    ServiceTypeId:
+      name: serviceTypeId
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            code: VALIDATION_ERROR
+            message: request validation failed
+            requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+            details:
+              fields:
+                date: must be a valid YYYY-MM-DD calendar date
+    InternalError:
+      description: Unexpected server failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            code: INTERNAL_ERROR
+            message: an unexpected error occurred
+            requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+    MethodNotAllowed:
+      description: The HTTP method is not supported by this resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            code: METHOD_NOT_ALLOWED
+            message: method not allowed
+            requestId: 2ff2f9fbdac54da18c7f2ca4d52d220d
+  schemas:
+    Identifier:
+      type: string
+      format: uuid
+      minLength: 36
+      maxLength: 36
+      pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    OffsetDateTime:
+      type: string
+      format: date-time
+      pattern: "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    Vehicle:
+      type: object
+      additionalProperties: false
+      required: [id, customerId, label, registration]
+      properties:
+        id: { $ref: "#/components/schemas/Identifier" }
+        customerId: { $ref: "#/components/schemas/Identifier" }
+        label: { type: string }
+        registration: { type: string }
+    Dealership:
+      type: object
+      additionalProperties: false
+      required: [id, name, address, timezone]
+      properties:
+        id: { $ref: "#/components/schemas/Identifier" }
+        name: { type: string }
+        address: { type: string }
+        timezone: { type: string }
+    ServiceType:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, durationMinutes]
+      properties:
+        id: { $ref: "#/components/schemas/Identifier" }
+        name: { type: string }
+        description: { type: string }
+        durationMinutes: { type: integer, minimum: 1 }
+    BookingOptions:
+      type: object
+      additionalProperties: false
+      required: [vehicles, dealerships, serviceTypes]
+      properties:
+        vehicles:
+          type: array
+          items: { $ref: "#/components/schemas/Vehicle" }
+        dealerships:
+          type: array
+          items: { $ref: "#/components/schemas/Dealership" }
+        serviceTypes:
+          type: array
+          items: { $ref: "#/components/schemas/ServiceType" }
+    AvailabilitySlot:
+      type: object
+      additionalProperties: false
+      required: [startAt, endAt]
+      properties:
+        startAt: { $ref: "#/components/schemas/OffsetDateTime" }
+        endAt: { $ref: "#/components/schemas/OffsetDateTime" }
+    ConfirmAppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicleId, dealershipId, serviceTypeId, startAt]
+      properties:
+        vehicleId: { $ref: "#/components/schemas/Identifier" }
+        dealershipId: { $ref: "#/components/schemas/Identifier" }
+        serviceTypeId: { $ref: "#/components/schemas/Identifier" }
+        startAt: { $ref: "#/components/schemas/OffsetDateTime" }
+    Appointment:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          status,
+          vehicle,
+          dealership,
+          serviceType,
+          technician,
+          serviceBay,
+          startAt,
+          endAt,
+        ]
+      properties:
+        id: { $ref: "#/components/schemas/Identifier" }
+        status: { type: string, const: CONFIRMED }
+        vehicle: { $ref: "#/components/schemas/Vehicle" }
+        dealership: { $ref: "#/components/schemas/Dealership" }
+        serviceType: { $ref: "#/components/schemas/ServiceType" }
+        technician:
+          $ref: "#/components/schemas/AssignedResource"
+        serviceBay:
+          $ref: "#/components/schemas/AssignedResource"
+        startAt: { $ref: "#/components/schemas/OffsetDateTime" }
+        endAt: { $ref: "#/components/schemas/OffsetDateTime" }
+    AssignedResource:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { $ref: "#/components/schemas/Identifier" }
+        name: { type: string }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, requestId]
+      properties:
+        code:
+          type: string
+          enum:
+            [
+              VALIDATION_ERROR,
+              RESOURCE_CONFLICT,
+              IDEMPOTENCY_CONFLICT,
+              NOT_FOUND,
+              INTERNAL_ERROR,
+              NOT_READY,
+              METHOD_NOT_ALLOWED,
+            ]
+        message: { type: string }
+        requestId: { type: string }
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok

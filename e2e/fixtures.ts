@@ -1,0 +1,16 @@
+export const bookingFixture = {
+  vehicle: "Silver Hatchback · DEMO-001",
+  vehicleLabel: "Silver Hatchback",
+  registration: "DEMO-001",
+  centre: "Riverside Service Centre",
+  centreAddress: "100 Riverside Way",
+  centreTimezone: "Europe/London",
+  service: "Routine Inspection · 60 min",
+  serviceName: "Routine Inspection",
+  serviceDescription: "A standard safety and maintenance inspection.",
+  durationMinutes: 60,
+  date: "2030-01-03",
+  duration: "Routine Inspection · 60 minutes",
+  technician: "Taylor Morgan",
+  bay: "Bay A",
+} as const;

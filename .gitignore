@@ -1,0 +1,20 @@
+# Source and generated document artifacts must stay outside version control.
+*.[pP][dD][fF]
+
+# Local environment and dependency output.
+.env
+.env.*
+!.env.example
+node_modules/
+.pnpm-store/
+.next/
+next-env.d.ts
+coverage/
+playwright-report/
+test-results/
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Optional local additions to the built-in confidentiality detector.
+.confidentiality-patterns.local

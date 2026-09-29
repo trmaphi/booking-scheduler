@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+api/tmp
+api/.cache
+.env
+.env.*
+!.env.example
+*.log

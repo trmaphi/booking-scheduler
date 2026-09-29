@@ -1,0 +1,32 @@
+schema: spec-driven
+
+context: |
+  Product: a neutral automotive service appointment scheduler.
+  Confidentiality: generated files, sample data, commit messages, and product copy must not name or reveal the organization that supplied the source brief.
+  Architecture: a Next.js TypeScript frontend, a separate Go REST API, and PostgreSQL persistence run together through local Docker Compose. Production hosting remains undecided.
+  Correctness: availability reads are advisory; appointment confirmation must atomically prevent overlapping technician and service-bay assignments.
+  Time: API timestamps include an explicit UTC offset, storage uses UTC, and appointment ranges are half-open [start, end).
+  Quality: core business rules and database concurrency behavior require automated tests.
+  Documentation: every assumption and material design decision must include consequences or trade-offs.
+  Process: use conventional commits and preserve an auditable AI collaboration narrative.
+
+rules:
+  proposal:
+    - Include an explicit non-goals section.
+    - Keep all names and examples vendor-neutral.
+  specs:
+    - Express requirements with testable scenarios.
+    - Distinguish source constraints from documented assumptions.
+  design:
+    - Trace decisions to requirements or assumptions.
+    - Record alternatives and trade-offs for every material design decision.
+    - Include architecture, data flow, observability, reliability, scalability, performance, maintainability, and AI verification strategy.
+  tasks:
+    - Order work so each milestone leaves a testable increment.
+    - Include explicit concurrency and idempotency verification.
+
+operations:
+  apply:
+    guidance:
+      - Use test-driven development for business logic and booking concurrency.
+      - Never introduce source-organization names into tracked files or history.
