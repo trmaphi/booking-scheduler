@@ -147,7 +147,7 @@ The production bootstrap, CI deployment, rollback, monitoring, and backup proced
 
 It runs sequentially and stops on the first failure. It removes all Compose volumes, verifies the generated client, runs frontend formatting/lint/unit/type/build checks, checks Go formatting and vet, starts a newly migrated and seeded stack, runs the full Go suite with PostgreSQL and the race detector, repeats concurrency and idempotency tests, builds both Go commands, runs smoke and Playwright checks, validates OpenSpec, scans tracked files and every reachable Git object for confidential artifacts, and requires a clean Git tree. Because it begins by deleting volumes, do not run it when local database contents must be retained.
 
-Recorded evidence and tool versions are in [docs/verification.md](docs/verification.md). The concise review walkthrough is in [docs/demo-script.md](docs/demo-script.md), and [docs/ai-collaboration.md](docs/ai-collaboration.md) describes how assisted work was reviewed.
+Recorded evidence and tool versions are in [docs/verification.md](docs/verification.md).
 
 ### Latest verification
 

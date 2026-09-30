@@ -1,5 +1,7 @@
 # Source and generated document artifacts must stay outside version control.
 *.[pP][dD][fF]
+docs/demo-script.md
+docs/ai-collaboration.md
 
 # Local environment and dependency output.
 .env
