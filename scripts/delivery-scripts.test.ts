@@ -97,6 +97,7 @@ describe("delivery verification contract", () => {
         "Compose smoke checks",
         "Playwright booking journey",
         "OpenSpec strict validation",
+        "production infrastructure",
         "confidentiality scan",
         "clean Git tree",
       ]),
@@ -213,13 +214,8 @@ describe("confidentiality scanner", () => {
 
   test("still rejects provider credentials", () => {
     const cwd = repository();
-    const fakeSecret = ["FAKE", "SECRET", "MARKER", "1234567890"].join(
-      "_",
-    );
-    writeFileSync(
-      join(cwd, "deploy.env"),
-      `token=${fakeSecret}\n`,
-    );
+    const fakeSecret = ["FAKE", "SECRET", "MARKER", "1234567890"].join("_");
+    writeFileSync(join(cwd, "deploy.env"), `token=${fakeSecret}\n`);
     git(cwd, "add", ".");
 
     const result = scan(cwd);

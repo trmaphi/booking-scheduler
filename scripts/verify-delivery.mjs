@@ -65,6 +65,11 @@ export const deliverySteps = [
     args: ["validate", "bootstrap-service-scheduler", "--strict"],
   },
   {
+    name: "production infrastructure",
+    command: "pnpm",
+    args: ["verify:infrastructure"],
+  },
+  {
     name: "confidentiality scan",
     command: "pnpm",
     args: ["scan:confidentiality"],

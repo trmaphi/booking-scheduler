@@ -2,7 +2,7 @@
 
 This repository demonstrates a resource-constrained service booking system. A Next.js interface calls a separate Go REST API, and PostgreSQL persists appointments and enforces the final allocation invariants. All committed fixtures are fictional.
 
-Production hosting, domains, and managed database choices remain undecided. The application runs locally with Docker Compose and standard PostgreSQL URLs; no hosted account or paid service is required.
+Production runs on the documented Ubuntu VPS through immutable GHCR images, Docker Compose, Caddy HTTPS, private PostgreSQL storage, encrypted R2 backups, and metrics-only Grafana Alloy host monitoring. Local development remains self-contained and requires no hosted account.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ The OpenAPI contract is the source for the TypeScript client in `src/features/bo
 ## Prerequisites
 
 - Docker with Compose v2
-- Node.js 26.10.0 or newer
+- Node.js 24.x
 - pnpm 10.17.1
 - Go at the version declared in `api/go.mod`
 - OpenSpec CLI for strict specification validation
@@ -135,6 +135,14 @@ The complete release gate is:
 pnpm verify:delivery
 ```
 
+Production infrastructure can be checked independently without changing a remote host:
+
+```sh
+pnpm verify:infrastructure
+```
+
+The production bootstrap, CI deployment, rollback, monitoring, and backup procedures are in [docs/operations/production-deployment.md](docs/operations/production-deployment.md). Recovery and quarterly restore-drill procedures are in [docs/operations/disaster-recovery.md](docs/operations/disaster-recovery.md).
+
 It runs sequentially and stops on the first failure. It removes all Compose volumes, verifies the generated client, runs frontend formatting/lint/unit/type/build checks, checks Go formatting and vet, starts a newly migrated and seeded stack, runs the full Go suite with PostgreSQL and the race detector, repeats concurrency and idempotency tests, builds both Go commands, runs smoke and Playwright checks, validates OpenSpec, scans tracked files and every reachable Git object for confidential artifacts, and requires a clean Git tree. Because it begins by deleting volumes, do not run it when local database contents must be retained.
 
 Recorded evidence and tool versions are in [docs/verification.md](docs/verification.md). The concise review walkthrough is in [docs/demo-script.md](docs/demo-script.md), and [docs/ai-collaboration.md](docs/ai-collaboration.md) describes how assisted work was reviewed.
@@ -147,7 +155,7 @@ On 2026-09-29 UTC, sanitized candidate `58b0109c6b9c` passed all 18 delivery ste
 
 The API emits structured JSON operational events to standard output. Request, availability, confirmation, conflict, retry, database, counter, and duration events use bounded dimensions such as route templates, result categories, service-centre/service-type identifiers, request IDs, and trace IDs. Tests reject customer details, registrations, request bodies, direct customer/vehicle identifiers, idempotency keys, raw database errors, and connection strings in telemetry.
 
-The API accepts one canonical W3C `traceparent` header, preserves a valid incoming trace ID and sampling flag, creates a new request span, returns the canonical child header, and correlates HTTP and database events. Invalid or ambiguous headers are replaced. Local JSON events need no collector. A future exporter can implement the `telemetry.Recorder` interface; no OpenTelemetry exporter is currently configured.
+The API accepts one canonical W3C `traceparent` header, preserves a valid incoming trace ID and sampling flag, creates a new request span, returns the canonical child header, and correlates HTTP and database events. Invalid or ambiguous headers are replaced. Local application events remain JSON logs with no remote log or trace exporter. Production host metrics are sent by Grafana Alloy; a future application-metrics exporter can implement the `telemetry.Recorder` interface.
 
 ## Troubleshooting
 
@@ -165,4 +173,4 @@ The API accepts one canonical W3C `traceparent` header, preserves a valid incomi
 - Deterministic load-then-identifier ordering is easy to test. A richer assignment policy could improve fairness but needs operational data and explicit business rules.
 - A single Go API process is enough for this bounded synchronous workflow. A worker or queue becomes useful for slow external integrations, reminders, or retryable side effects; none are required for confirmation itself.
 - JSON telemetry keeps local development self-contained. A production exporter and collector would improve aggregation while adding deployment and cost decisions.
-- The browser calls the Go API directly in local development. A same-origin proxy can simplify production CORS, but its hosting topology remains deliberately undecided.
+- The browser calls the Go API directly in local development. Production uses Caddy for same-origin web and `/api/*` routing.
