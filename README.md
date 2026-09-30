@@ -7,14 +7,44 @@ Production runs on the documented Ubuntu VPS through immutable GHCR images, Dock
 ## Architecture
 
 ```text
-Browser → Next.js web (3000) → Go REST API (8080) → PostgreSQL (55432)
-                                  │
-                                  └─ JSON logs, metrics, W3C trace context
+┌─────────────┐      ┌───────────────────┐      ┌─────────────────┐
+│   Browser   │ ───▶ │  Next.js web app  │ ───▶ │   Go REST API   │
+└─────────────┘      │       :3000       │      │      :8080      │
+                     └───────────────────┘      └────────┬────────┘
+                                                       │
+                                            ┌──────────▼──────────┐
+                                            │     PostgreSQL      │
+                                            │       :55432        │
+                                            └─────────────────────┘
+
+                                  JSON logs · Metrics · W3C trace context
 ```
 
-The API is split into HTTP transport, application orchestration, domain rules, and PostgreSQL adapters. Availability returns slots only when a qualified technician and a bay can cover the full service interval. Confirmation runs in a database transaction, derives the end time from the service type, allocates both resources, and relies on partial GiST exclusion constraints to reject overlapping confirmed work. Idempotency records make safe retries return the original appointment.
+The backend follows a layered architecture:
 
-The OpenAPI contract is the source for the TypeScript client in `src/features/booking/api/generated`. `pnpm api:check` regenerates it and fails when committed output is stale.
+```text
+HTTP transport → Application services → Domain rules → PostgreSQL adapters
+```
+
+### Scheduling guarantees
+
+- **Conflict-free availability** — A slot is returned only when both a qualified technician and a service bay are available for the entire appointment.
+- **Atomic confirmation** — Booking confirmation derives the end time from the service type and allocates both resources in one database transaction.
+- **Database-enforced safety** — Partial GiST exclusion constraints prevent overlapping confirmed appointments, even under concurrent requests.
+- **Safe retries** — Idempotency records ensure repeated confirmation requests return the original appointment instead of creating duplicates.
+
+### Contract-first client
+
+The OpenAPI specification is the source of truth for the generated TypeScript client:
+
+```text
+OpenAPI contract
+       │
+       ▼
+src/features/booking/api/generated
+```
+
+`pnpm api:check` regenerates the client and fails when the committed output is stale.
 
 The target fleet-booking replacement architecture, proposed OpenID Connect identity model, and scaling path are documented in [docs/system-design.md](docs/system-design.md).
 
