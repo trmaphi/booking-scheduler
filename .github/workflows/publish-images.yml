@@ -38,7 +38,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Cache infrastructure verification collections
         id: verification-collections-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ansible/collections
           key: ansible-collections-${{ runner.os }}-${{ hashFiles('infra/ansible/requirements.yml') }}
@@ -112,7 +112,7 @@ jobs:
         run: pipx install ansible-core
       - name: Cache required collections
         id: release-collections-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ansible/collections
           key: ansible-collections-${{ runner.os }}-${{ hashFiles('infra/ansible/requirements.yml') }}

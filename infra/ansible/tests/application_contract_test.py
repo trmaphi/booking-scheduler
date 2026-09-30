@@ -74,12 +74,13 @@ class ApplicationContractTest(unittest.TestCase):
         self.assertIn("packages: write", workflow)
         self.assertIn("contents: read", workflow)
         self.assertIn("pnpm/action-setup@v6", workflow)
+        self.assertEqual(workflow.count("actions/cache@v6"), 2)
         self.assertIn("docker/setup-buildx-action@v4", workflow)
         self.assertIn("docker/login-action@v4", workflow)
         self.assertIn("docker/build-push-action@v7", workflow)
         self.assertNotRegex(
             workflow,
-            r"(?:pnpm/action-setup@v4|docker/setup-buildx-action@v3|docker/login-action@v3|docker/build-push-action@v6)",
+            r"(?:pnpm/action-setup@v4|actions/cache@v4|docker/setup-buildx-action@v3|docker/login-action@v3|docker/build-push-action@v6)",
         )
         self.assertIn("pnpm verify:infrastructure", workflow)
         self.assertIn("@fission-ai/openspec@1.13.1", workflow)

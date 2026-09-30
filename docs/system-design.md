@@ -25,6 +25,29 @@ The implemented service scheduler is defined by the completed OpenSpec change:
 
 The fleet replacement described below is **Proposed** and is not represented by that completed change. It requires a separate OpenSpec change before implementation. **Alternative** sections describe optional future approaches rather than committed scope.
 
+## Current implementation: why these technologies now
+
+The implemented service scheduler deliberately uses a small, synchronous stack. These choices fit the current workload and keep the most important booking guarantees explicit without introducing infrastructure that the workflow does not yet need.
+
+| Choice                    | Why it fits now                                                                                                                                                                                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL                | Booking correctness depends on transactional writes and preventing overlapping resource allocations. PostgreSQL can enforce that invariant with partial GiST exclusion constraints, so every writer receives the same protection and conflicts remain visible in durable database state. |
+| Go REST API               | Confirmation is a bounded request/response workflow. Go provides a small deployable service, straightforward concurrency, and strong database and HTTP support without requiring a separate application runtime or background processing tier.                                           |
+| Next.js web application   | The booking journey benefits from a typed, component-based browser interface. Next.js supports that interface and production delivery while the generated TypeScript client keeps it aligned with the OpenAPI contract.                                                                  |
+| OpenAPI-generated client  | One contract can define the API and generate the browser client. This catches drift during development instead of relying on manually duplicated request and response types.                                                                                                             |
+| Structured JSON telemetry | Machine-readable events are easy to test, inspect locally, and collect from container output. They provide request and database correlation without requiring a hosted observability platform at this stage.                                                                             |
+| Docker Compose            | The web app, API, migration step, and PostgreSQL can run as one reproducible stack in development and on the current single-host deployment. A container orchestrator would add operational overhead without solving a present scaling requirement.                                      |
+| Caddy in production       | Caddy terminates HTTPS and presents the web application and `/api/*` under one origin. This keeps browser routing and cross-origin policy simple while avoiding custom TLS automation.                                                                                                   |
+
+## Current implementation: trade-offs and alternatives
+
+- PostgreSQL exclusion constraints and transactions make correctness durable and observable, at the cost of database-specific SQL. An application-only lock is more portable but cannot protect writes from every process.
+- Availability is advisory and confirmation rechecks constraints. Holding a reservation would reduce stale selections but adds expiry, cleanup, and user-state complexity that the current booking journey does not require.
+- Deterministic load-then-identifier ordering is predictable and easy to test. A richer assignment policy could improve fairness, but selecting one responsibly requires operational data and explicit business rules that do not yet exist.
+- A single Go API process is sufficient for the bounded synchronous workflow. A worker or queue becomes useful for slow external integrations, reminders, or retryable side effects; none are required for confirmation itself.
+- JSON telemetry keeps local development and the current deployment self-contained. A production exporter and collector would improve cross-instance aggregation, but also require retention, deployment, and cost decisions that are premature at the current scale.
+- The browser calls the Go API directly in local development for a short feedback loop. Production uses Caddy for same-origin web and `/api/*` routing so TLS and browser-facing routing remain centralized without changing the API.
+
 ## Proposed: hard booking invariant
 
 > One individual resource cannot have overlapping confirmed allocations.
