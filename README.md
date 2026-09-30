@@ -16,6 +16,8 @@ The API is split into HTTP transport, application orchestration, domain rules, a
 
 The OpenAPI contract is the source for the TypeScript client in `src/features/booking/api/generated`. `pnpm api:check` regenerates it and fails when committed output is stale.
 
+The concise architecture, proposed OpenID Connect identity model, and scaling alternatives are documented in [docs/system-design.md](docs/system-design.md).
+
 ## Prerequisites
 
 - Docker with Compose v2
