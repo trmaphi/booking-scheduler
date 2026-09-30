@@ -68,6 +68,7 @@ class ApplicationContractTest(unittest.TestCase):
         self.assertIn("GHCR_DEPLOY_TOKEN: ${{ secrets.GITHUB_TOKEN }}", workflow)
         self.assertIn('application_ghcr_token:$token', workflow)
         self.assertIn('ghcr.json', workflow)
+        self.assertIn("printf '%s\\n' \"$VPS_SSH_PRIVATE_KEY\"", workflow)
         self.assertIn("--skip-tags backup", workflow)
         self.assertNotRegex(workflow, r"(?i)(?:password|private_key):\s*[^$\s]")
 

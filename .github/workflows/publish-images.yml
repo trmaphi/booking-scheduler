@@ -86,7 +86,7 @@ jobs:
             fi
           done
           install -m 700 -d "$RUNNER_TEMP/deploy"
-          printf '%s' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy/id_ed25519"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy/id_ed25519"
           printf '%s' "$PRODUCTION_VARS_YAML" > "$RUNNER_TEMP/deploy/production.yml"
           printf '%s' "$PRODUCTION_VAULT_YAML" > "$RUNNER_TEMP/deploy/production.vault.yml"
           printf '%s' "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/deploy/vault-password"
