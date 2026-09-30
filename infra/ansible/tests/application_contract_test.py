@@ -73,6 +73,7 @@ class ApplicationContractTest(unittest.TestCase):
         self.assertIn("packages: write", publish)
         self.assertIn("contents: read", publish)
         self.assertIn("pnpm verify:infrastructure", publish)
+        self.assertIn("@fission-ai/openspec@1.13.1", publish)
         self.assertLess(publish.index("pnpm verify:infrastructure"), publish.index("Build and publish web image"))
         self.assertRegex(publish, r"(?s)migrate:.*?needs: verify-and-publish.*?migrate-production.yml")
         self.assertRegex(publish, r"(?s)deploy:.*?needs: migrate.*?deploy-production.yml")

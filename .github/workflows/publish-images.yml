@@ -36,6 +36,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/infrastructure-venv"
           "$RUNNER_TEMP/infrastructure-venv/bin/pip" install ansible-core ansible-lint
+          npm install --global @fission-ai/openspec@1.13.1
           echo "$RUNNER_TEMP/infrastructure-venv/bin" >> "$GITHUB_PATH"
       - name: Install infrastructure verification collections
         run: ansible-galaxy collection install -r infra/ansible/requirements.yml
