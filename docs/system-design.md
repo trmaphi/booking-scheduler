@@ -2,7 +2,9 @@
 
 ## Status and scope
 
-This is the target replacement architecture for the current service-appointment scheduler. The first version books a quantity of fleet vehicles by type, supports different pickup and return locations, and backfills missing quantity asynchronously.
+**Status: Proposed replacement.** This design is not implemented by the current repository.
+
+The current implementation remains the service-appointment scheduler defined by the completed OpenSpec change. This target architecture replaces it with fleet booking: users request a quantity of vehicles by type, may use different pickup and return locations, and may receive asynchronous backfill for missing quantity.
 
 The core is intentionally resource-neutral:
 
@@ -12,13 +14,24 @@ The core is intentionally resource-neutral:
 - `booking`: customer demand for a type, quantity, interval, pickup, and return.
 - `allocation`: assignment of one individual resource to a booking.
 
-## Hard booking invariant
+## Specification traceability
+
+The implemented service scheduler is defined by the completed OpenSpec change:
+
+- [Proposal](../openspec/changes/bootstrap-service-scheduler/proposal.md)
+- [Capability specification](../openspec/changes/bootstrap-service-scheduler/specs/service-appointment-booking/spec.md)
+- [Implementation design](../openspec/changes/bootstrap-service-scheduler/design.md)
+- [Completed tasks](../openspec/changes/bootstrap-service-scheduler/tasks.md)
+
+The fleet replacement described below is **Proposed** and is not represented by that completed change. It requires a separate OpenSpec change before implementation. **Alternative** sections describe optional future approaches rather than committed scope.
+
+## Proposed: hard booking invariant
 
 > One individual resource cannot have overlapping confirmed allocations.
 
 Multiple resources of the same type may be booked concurrently. Type capacity for an interval is the count of eligible individual resources that can satisfy it. Qualification, routing, identity, partial fulfillment, and fairness are policies or requirements; they do not replace the database invariant.
 
-## Architecture
+## Proposed: architecture
 
 ```mermaid
 flowchart LR
@@ -36,7 +49,7 @@ flowchart LR
 - The worker retries missing quantity and may scale to multiple containers.
 - The API and worker are stateless; PostgreSQL is the initial consistency and queue authority.
 
-## Data model
+## Proposed: data model
 
 ```mermaid
 erDiagram
@@ -86,7 +99,7 @@ erDiagram
 
 PostgreSQL uses a partial GiST exclusion constraint on `resource_id` and the half-open interval `[start_at, end_at)` for allocation statuses that consume capacity.
 
-## Identity
+## Proposed: identity
 
 The system accepts any standards-compliant OpenID Connect provider.
 
@@ -108,7 +121,7 @@ sequenceDiagram
 
 `(issuer, subject)` is the stable external identity. The API derives the customer identifier and applies ownership or staff authorization locally.
 
-## Confirmation and partial fulfillment
+## Proposed: confirmation and partial fulfillment
 
 ```mermaid
 sequenceDiagram
@@ -140,7 +153,7 @@ sequenceDiagram
 - Worker claims and retries are idempotent.
 - Every added allocation is revalidated by PostgreSQL.
 
-## Location continuity
+## Proposed: location continuity
 
 A resource keeps one immutable scheduling owner even when its physical location changes. This keeps its complete allocation timeline under one transactional authority.
 
@@ -154,7 +167,7 @@ Version-one eligibility is deliberately simple:
 
 An explicit transfer movement may reposition a resource. Version one does not optimize transfers or routes.
 
-## Docker services
+## Proposed: Docker services
 
 ```mermaid
 flowchart LR
@@ -166,7 +179,7 @@ flowchart LR
 
 The API and worker may use the same Go image with different commands. Multiple workers claim distinct pending rows with `FOR UPDATE SKIP LOCKED`. Graceful shutdown commits or rolls back the active transaction before exit.
 
-## Allocation strategy
+## Proposed: allocation strategy
 
 ### Version one: deterministic allocator
 
@@ -178,7 +191,7 @@ The API and worker may use the same Go image with different commands. Multiple w
 
 Capacity counters alone are insufficient because the system must identify and route individual vehicles.
 
-### Future: OR-Tools adapter
+### Alternative: OR-Tools adapter
 
 ```mermaid
 flowchart LR
@@ -191,7 +204,7 @@ flowchart LR
 
 OR-Tools may later propose vehicle assignment, transfers, multi-location routing, and rebalancing that minimizes distance, cost, or unmet demand. PostgreSQL still validates every proposal and remains the no-overlap authority. Optimization improves utilization; it does not create physical fleet capacity.
 
-## Scaling
+## Proposed scaling and alternatives
 
 | Stage | Architecture                        | Guarantee                          | Trade-off                                     |
 | ----- | ----------------------------------- | ---------------------------------- | --------------------------------------------- |
@@ -203,7 +216,7 @@ OR-Tools may later propose vehicle assignment, transfers, multi-location routing
 
 Scale traffic independently from fleet capacity. More API or worker containers can process more demand, but only additional eligible vehicles or better routing can increase fulfillable bookings.
 
-## Failure handling and verification
+## Proposed: failure handling and verification
 
 - Use idempotency keys for confirmation and worker retries.
 - Return the allocated and remaining quantities explicitly.
