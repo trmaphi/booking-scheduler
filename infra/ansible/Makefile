@@ -22,7 +22,7 @@ bootstrap:
 # First run only: connect as root with an interactive SSH password prompt.
 bootstrap-root:
 	@test -n "$(PUBLIC_KEY_FILE)" || (echo "PUBLIC_KEY_FILE is required" >&2; exit 2)
-	ansible-playbook -i inventory/production.yml playbooks/bootstrap.yml --user root --ask-pass --extra-vars "bootstrap_public_key=$$(cat '$(PUBLIC_KEY_FILE)')"
+	ansible-playbook -i inventory/production.yml playbooks/bootstrap.yml --ask-pass --extra-vars "ansible_user=root" --extra-vars "bootstrap_public_key=$$(cat '$(PUBLIC_KEY_FILE)')"
 
 monitoring:
 	ansible-playbook -i inventory/production.yml playbooks/monitoring.yml --ask-vault-pass --extra-vars @group_vars/monitoring.yml --extra-vars @group_vars/monitoring.vault.yml

@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+import subprocess
+import tempfile
 import unittest
 import yaml
 
@@ -31,7 +34,7 @@ class BootstrapContractTest(unittest.TestCase):
 
     def test_firewall_denies_inbound_and_allows_only_public_ports(self):
         tasks = self.read("roles/security/tasks/main.yml")
-        variables = self.read("group_vars/all.yml")
+        variables = self.read("inventory/group_vars/all.yml")
         self.assertIn("default: deny", tasks)
         self.assertEqual(tasks.count("rule: allow"), 1)
         for port in (22, 80, 443):
@@ -59,8 +62,51 @@ class BootstrapContractTest(unittest.TestCase):
         self.assertIn("visudo -cf %s", tasks)
         policy = self.read("roles/security/templates/99-booking-scheduler-deploy.j2")
         self.assertIn("NOPASSWD", policy)
-        self.assertIn("/usr/bin/python3", policy)
+        self.assertIn("/bin/sh -c echo BECOME-SUCCESS-", policy)
+        self.assertIn("; /usr/bin/python3*", policy)
+        self.assertNotIn(r"\;", policy)
         self.assertNotIn("ALL=(ALL) NOPASSWD: ALL", policy)
+
+    def test_inventory_loads_shared_application_variables(self):
+        environment = {
+            **os.environ,
+            "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"),
+        }
+        result = subprocess.run(
+            [
+                "ansible-inventory",
+                "-i",
+                str(ROOT / "inventory/production.yml"),
+                "--host",
+                "booking-scheduler-production",
+            ],
+            cwd=ROOT.parents[1],
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        variables = yaml.safe_load(result.stdout)
+        self.assertEqual(variables["application_group"], "deploy")
+        self.assertEqual(variables["application_root"], "/opt/booking-scheduler")
+
+    def test_bootstrap_root_overrides_inventory_deploy_user(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pub") as public_key:
+            public_key.write("ssh-ed25519 fake-test-key bootstrap-contract\n")
+            public_key.flush()
+            result = subprocess.run(
+                [
+                    "make",
+                    "--dry-run",
+                    "bootstrap-root",
+                    f"PUBLIC_KEY_FILE={public_key.name}",
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        self.assertIn("ansible_user=root", result.stdout)
 
 
 if __name__ == "__main__":
