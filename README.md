@@ -90,7 +90,7 @@ WEB_PORT=3001 API_PORT=8081 POSTGRES_PORT=55433 pnpm stack:smoke
 
 ## REST API
 
-The complete contract and examples are in `api/openapi/booking-api.yaml`. These examples use only the committed fictional fixtures. With the API running, browse the interactive Scalar reference at `http://localhost:8080/docs` or fetch the raw contract from `http://localhost:8080/openapi.yaml`.
+The complete contract and examples are in `api/openapi/booking-api.yaml`. These examples use only the committed fictional fixtures. With the API running, browse the interactive Scalar reference at `http://localhost:8080/api/docs` or fetch the raw contract from `http://localhost:8080/api/openapi.yaml`.
 
 ```sh
 curl --fail http://localhost:8080/api/v1/booking-options
@@ -197,12 +197,3 @@ The API accepts one canonical W3C `traceparent` header, preserves a valid incomi
 - **Database tests skip:** start Compose and provide `TEST_DATABASE_URL` as shown above.
 - **E2E reports a stale artifact:** use `pnpm stack:reset`; the delivery gate requires a fresh artifact volume.
 - **Dependencies changed inside the web container:** restart `pnpm stack:start`; startup refreshes the named dependency volume from the lockfile.
-
-## Trade-offs and alternatives
-
-- PostgreSQL exclusion constraints and transactions make correctness durable and observable, at the cost of database-specific SQL. An application-only lock is more portable but cannot protect writes from every process.
-- Availability is advisory and confirmation rechecks constraints. Holding a reservation would reduce stale selections but adds expiry, cleanup, and user-state complexity.
-- Deterministic load-then-identifier ordering is easy to test. A richer assignment policy could improve fairness but needs operational data and explicit business rules.
-- A single Go API process is enough for this bounded synchronous workflow. A worker or queue becomes useful for slow external integrations, reminders, or retryable side effects; none are required for confirmation itself.
-- JSON telemetry keeps local development self-contained. A production exporter and collector would improve aggregation while adding deployment and cost decisions.
-- The browser calls the Go API directly in local development. Production uses Caddy for same-origin web and `/api/*` routing.
