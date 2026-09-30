@@ -1,0 +1,74 @@
+---
+- name: Start production application services
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - up
+      - --detach
+      - --wait
+      - api
+      - web
+      - proxy
+  changed_when: true
+  no_log: true
+
+- name: Verify local API readiness through proxy
+  ansible.builtin.uri:
+    url: http://127.0.0.1/api/v1/health/ready
+    headers:
+      Host: "{{ app_domain }}"
+    status_code: [200, 308]
+    follow_redirects: none
+  register: application_local_api_health
+  retries: 12
+  delay: 5
+  until: application_local_api_health.status in [200, 308]
+
+- name: Verify public HTTPS web
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/"
+    status_code: 200
+    validate_certs: true
+  register: application_public_web_health
+  retries: 18
+  delay: 10
+  until: application_public_web_health.status == 200
+
+- name: Verify public HTTPS API readiness
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/api/v1/health/ready"
+    status_code: 200
+    validate_certs: true
+  register: application_public_api_health
+  retries: 12
+  delay: 5
+  until: application_public_api_health.status == 200
+
+- name: Point current release at verified release
+  ansible.builtin.file:
+    src: "{{ application_release_dir }}"
+    dest: "{{ application_current_link }}"
+    state: link
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    force: true
+
+- name: Record verified active release
+  ansible.builtin.copy:
+    content: "{{ release_tag }} {{ ansible_date_time.iso8601 }}\n"
+    dest: "{{ application_release_state_file }}"
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0640"
+
+- name: Prune dangling image layers
+  ansible.builtin.command: docker image prune --force --filter dangling=true
+  register: application_image_prune
+  changed_when: "'Total reclaimed space: 0B' not in application_image_prune.stdout"

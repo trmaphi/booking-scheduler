@@ -2,6 +2,8 @@
 - name: Roll back to an explicit immutable scheduler release
   hosts: production
   become: true
+  vars:
+    application_phase: deploy
   pre_tasks:
     - name: Require an explicit immutable rollback tag
       ansible.builtin.assert:

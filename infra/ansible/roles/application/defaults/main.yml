@@ -7,3 +7,4 @@ application_environment_file: "{{ application_config_root }}/production.env"
 application_release_state_file: "{{ application_state_root }}/active-release"
 application_ghcr_username: ""
 application_ghcr_token: ""
+application_phase: full

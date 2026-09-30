@@ -35,6 +35,7 @@ export const infrastructureSteps = [
   },
   syntaxStep("bootstrap playbook syntax", "bootstrap"),
   syntaxStep("monitoring playbook syntax", "monitoring"),
+  syntaxStep("migration playbook syntax", "migrate"),
   syntaxStep("deployment playbook syntax", "deploy"),
   syntaxStep("rollback playbook syntax", "rollback"),
   syntaxStep("backup playbook syntax", "backup"),

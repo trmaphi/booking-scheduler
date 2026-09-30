@@ -1,0 +1,17 @@
+---
+- name: Run database migrations
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ application_project_name }}"
+      - --env-file
+      - "{{ application_environment_file }}"
+      - --file
+      - "{{ application_release_dir }}/compose.production.yaml"
+      - run
+      - --rm
+      - migrate
+  changed_when: true
+  no_log: true

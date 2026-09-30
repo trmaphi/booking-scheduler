@@ -32,7 +32,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm production:check
+      - name: Install infrastructure verification tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/infrastructure-venv"
+          "$RUNNER_TEMP/infrastructure-venv/bin/pip" install ansible-core ansible-lint
+          echo "$RUNNER_TEMP/infrastructure-venv/bin" >> "$GITHUB_PATH"
+      - name: Install infrastructure verification collections
+        run: ansible-galaxy collection install -r infra/ansible/requirements.yml
+      - name: Verify production infrastructure
+        run: pnpm verify:infrastructure
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -60,53 +68,18 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/booking-scheduler-api:${{ github.sha }}
           build-args: REVISION=${{ github.sha }}
 
-  deploy:
+  migrate:
     if: github.ref == 'refs/heads/main' || inputs.deploy == true
     needs: verify-and-publish
-    runs-on: ubuntu-24.04
-    environment: production
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install Ansible
-        run: pipx install ansible-core
-      - name: Install required collections
-        run: ansible-galaxy collection install -r infra/ansible/requirements.yml
-      - name: Prepare ephemeral deployment credentials
-        env:
-          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          PRODUCTION_VARS_YAML: ${{ secrets.PRODUCTION_VARS_YAML }}
-          PRODUCTION_VAULT_YAML: ${{ secrets.PRODUCTION_VAULT_YAML }}
-          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          GHCR_DEPLOY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for required in VPS_SSH_PRIVATE_KEY PRODUCTION_VARS_YAML PRODUCTION_VAULT_YAML ANSIBLE_VAULT_PASSWORD GHCR_DEPLOY_TOKEN; do
-            if [ -z "${!required}" ]; then
-              echo "::error::$required is required for production deployment"
-              exit 1
-            fi
-          done
-          install -m 700 -d "$RUNNER_TEMP/deploy"
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy/id_ed25519"
-          printf '%s' "$PRODUCTION_VARS_YAML" > "$RUNNER_TEMP/deploy/production.yml"
-          printf '%s' "$PRODUCTION_VAULT_YAML" > "$RUNNER_TEMP/deploy/production.vault.yml"
-          printf '%s' "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/deploy/vault-password"
-          jq -n --arg username "$GITHUB_ACTOR" --arg token "$GHCR_DEPLOY_TOKEN" \
-            '{application_ghcr_username:$username,application_ghcr_token:$token}' \
-            > "$RUNNER_TEMP/deploy/ghcr.json"
-          chmod 600 "$RUNNER_TEMP/deploy/"*
-          ssh-keyscan -H 103.188.83.18 > "$RUNNER_TEMP/deploy/known_hosts"
-      - name: Deploy published commit to VPS
-        env:
-          ANSIBLE_CONFIG: infra/ansible/ansible.cfg
-          ANSIBLE_HOST_KEY_CHECKING: "true"
-          ANSIBLE_SSH_ARGS: "-o UserKnownHostsFile=${{ runner.temp }}/deploy/known_hosts"
-        run: >-
-          ansible-playbook -i infra/ansible/inventory/production.yml
-          infra/ansible/playbooks/deploy.yml
-          --private-key "$RUNNER_TEMP/deploy/id_ed25519"
-          --vault-password-file "$RUNNER_TEMP/deploy/vault-password"
-          --extra-vars @"$RUNNER_TEMP/deploy/production.yml"
-          --extra-vars @"$RUNNER_TEMP/deploy/production.vault.yml"
-          --extra-vars @"$RUNNER_TEMP/deploy/ghcr.json"
-          --skip-tags backup
-          --extra-vars release_tag=${{ github.sha }}
+    uses: ./.github/workflows/migrate-production.yml
+    with:
+      release_tag: ${{ github.sha }}
+    secrets: inherit
+
+  deploy:
+    if: github.ref == 'refs/heads/main' || inputs.deploy == true
+    needs: migrate
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      release_tag: ${{ github.sha }}
+    secrets: inherit

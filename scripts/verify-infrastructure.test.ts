@@ -13,6 +13,7 @@ describe("production infrastructure verification", () => {
       "production API image build",
       "bootstrap playbook syntax",
       "monitoring playbook syntax",
+      "migration playbook syntax",
       "deployment playbook syntax",
       "rollback playbook syntax",
       "backup playbook syntax",
