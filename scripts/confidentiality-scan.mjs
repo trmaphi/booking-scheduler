@@ -449,12 +449,13 @@ function hasProviderCommitment(pathText, text) {
       // Fall through to conservative text patterns.
     }
   }
-  const providerPolicyText = approvedProductionPath || approvedMonitoringPath
-    ? text.replace(
-        /(^|\n)(\s*(?:provider|deploy_provider|deployment_provider|hosting_provider)\s*[:=]\s*["']?)(?:cloudflare|grafana)\b/gi,
-        "$1$2approved-production-provider",
-      )
-    : text;
+  const providerPolicyText =
+    approvedProductionPath || approvedMonitoringPath
+      ? text.replace(
+          /(^|\n)(\s*(?:provider|deploy_provider|deployment_provider|hosting_provider)\s*[:=]\s*["']?)(?:cloudflare|grafana)\b/gi,
+          "$1$2approved-production-provider",
+        )
+      : text;
   const patterns = [
     new RegExp(`\\bprovider\\s*[:=]\\s*["']?${providerNames}\\b`, "i"),
     new RegExp(
@@ -516,9 +517,7 @@ function scanTrackedFiles() {
 }
 
 function scanCommitMetadata() {
-  const commits = asText(
-    git(["rev-list", "--branches", "--tags"], "utf8"),
-  )
+  const commits = asText(git(["rev-list", "--branches", "--tags"], "utf8"))
     .split(/\r?\n/)
     .filter(Boolean);
   for (const object of commits) {
