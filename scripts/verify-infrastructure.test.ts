@@ -9,12 +9,11 @@ describe("production infrastructure verification", () => {
   test("runs every infrastructure boundary in a fixed order", () => {
     expect(infrastructureSteps.map((step) => step.name)).toEqual([
       "production topology validation",
-      "production web image build",
-      "production API image build",
       "bootstrap playbook syntax",
       "monitoring playbook syntax",
       "migration playbook syntax",
       "deployment playbook syntax",
+      "release playbook syntax",
       "rollback playbook syntax",
       "backup playbook syntax",
       "restore playbook syntax",

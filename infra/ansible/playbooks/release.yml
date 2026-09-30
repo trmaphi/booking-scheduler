@@ -1,0 +1,9 @@
+---
+- name: Migrate and deploy an immutable scheduler release
+  hosts: production
+  become: true
+  vars:
+    application_phase: full
+  roles:
+    - role: application
+      tags: [application, release]
