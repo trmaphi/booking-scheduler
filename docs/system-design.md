@@ -1,28 +1,94 @@
-# System design
+# Fleet booking system design
 
-## Goals
+## Status and scope
 
-Provide a reliable booking path for a customer, vehicle, service type, service centre, qualified technician, and service bay. Keep confirmation strongly consistent while allowing the web and API layers to scale independently.
+This is the target replacement architecture for the current service-appointment scheduler. The first version books a quantity of fleet vehicles by type, supports different pickup and return locations, and backfills missing quantity asynchronously.
 
-## Current architecture
+The core is intentionally resource-neutral:
+
+- `resource_type`: a category such as compact car, van, or truck.
+- `resource`: one individually bookable vehicle.
+- `booking_policy`: eligibility, location, turnaround, and allocation rules.
+- `booking`: customer demand for a type, quantity, interval, pickup, and return.
+- `allocation`: assignment of one individual resource to a booking.
+
+## Hard booking invariant
+
+> One individual resource cannot have overlapping confirmed allocations.
+
+Multiple resources of the same type may be booked concurrently. Type capacity for an interval is the count of eligible individual resources that can satisfy it. Qualification, routing, identity, partial fulfillment, and fairness are policies or requirements; they do not replace the database invariant.
+
+## Architecture
 
 ```mermaid
 flowchart LR
     User[User] --> Web[Next.js web]
-    Web --> API[Go REST API]
+    Web --> IdP[OIDC provider]
+    Web --> API[Go API container]
     API --> DB[(PostgreSQL)]
-    API --> Telemetry[JSON logs and metrics]
+    Worker[Go allocation worker container] --> DB
+    API --> Telemetry[Logs and metrics]
+    Worker --> Telemetry
 ```
 
-- Next.js consumes the generated OpenAPI client.
-- The Go API is stateless and separates transport, application, domain, and PostgreSQL adapters.
-- Availability is advisory. Confirmation repeats validation in one database transaction.
-- PostgreSQL exclusion constraints prevent overlapping confirmed work for a technician or bay.
-- Idempotency records make confirmation retries safe.
+- The API performs synchronous search and confirmation.
+- PostgreSQL stores bookings, allocations, movements, and durable backfill work.
+- The worker retries missing quantity and may scale to multiple containers.
+- The API and worker are stateless; PostgreSQL is the initial consistency and queue authority.
 
-## User identity
+## Data model
 
-The target identity design is compatible with any standards-compliant OpenID Connect provider.
+```mermaid
+erDiagram
+    RESOURCE_TYPE ||--o{ RESOURCE : classifies
+    RESOURCE_TYPE ||--o{ BOOKING : requested_as
+    BOOKING ||--o{ ALLOCATION : receives
+    RESOURCE ||--o{ ALLOCATION : assigned_to
+    RESOURCE ||--o{ RESOURCE_MOVEMENT : follows
+    LOCATION ||--o{ BOOKING : pickup_or_return
+
+    RESOURCE_TYPE {
+        uuid id
+        string name
+        jsonb attributes
+    }
+
+    RESOURCE {
+        uuid id
+        uuid resource_type_id
+        uuid scheduling_owner_id
+        uuid home_location_id
+        string status
+        jsonb attributes
+    }
+
+    BOOKING {
+        uuid id
+        uuid requested_type_id
+        uuid pickup_location_id
+        uuid return_location_id
+        timestamp start_at
+        timestamp end_at
+        int requested_quantity
+        int minimum_quantity
+        string status
+        timestamp fulfillment_deadline
+    }
+
+    ALLOCATION {
+        uuid booking_id
+        uuid resource_id
+        timestamp start_at
+        timestamp end_at
+        string status
+    }
+```
+
+PostgreSQL uses a partial GiST exclusion constraint on `resource_id` and the half-open interval `[start_at, end_at)` for allocation statuses that consume capacity.
+
+## Identity
+
+The system accepts any standards-compliant OpenID Connect provider.
 
 ```mermaid
 sequenceDiagram
@@ -34,110 +100,113 @@ sequenceDiagram
 
     User->>Web: Sign in
     Web->>IdP: Authorization Code with PKCE
-    IdP-->>Web: ID and access tokens
+    IdP-->>Web: Access token
     Web->>API: Request with access token
     API->>API: Validate signature, issuer, audience, and expiry
     API->>DB: Resolve issuer and subject to customer
-    DB-->>API: Customer identity and roles
 ```
 
-- `(issuer, subject)` is the stable external identity key; email is not an identifier.
-- The API derives `customer_id` from the validated identity. A client cannot select another customer.
-- Vehicle and appointment access requires customer ownership. Staff access requires trusted claims or local role mappings.
-- The provider owns authentication and MFA; the application owns authorization.
-- Authentication and authorization are a proposed extension, not part of the current implementation.
+`(issuer, subject)` is the stable external identity. The API derives the customer identifier and applies ownership or staff authorization locally.
 
-## Target confirmation flow
-
-With the proposed OIDC extension, confirmation adds authenticated ownership checks to the existing transaction:
+## Confirmation and partial fulfillment
 
 ```mermaid
 sequenceDiagram
     participant Client
-    participant API as Go API
+    participant API
     participant DB as PostgreSQL
+    participant Worker
 
-    Client->>API: Confirm with idempotency key
-    API->>DB: Begin transaction
-    DB->>DB: Validate identity, ownership, and inputs
-    DB->>DB: Select qualified technician and active bay
-    DB->>DB: Insert appointment
-    DB->>DB: Enforce exclusion constraints
-    alt resources remain available
-        DB-->>API: Commit appointment
-        API-->>Client: 201 Created
-    else conflict or changed key input
-        DB-->>API: Roll back
-        API-->>Client: 409 Conflict
+    Client->>API: Type, quantity, minimum, interval, pickup, return
+    API->>DB: Begin allocation transaction
+    DB->>DB: Find eligible, reachable, non-overlapping resources
+    DB->>DB: Lock candidates and insert allocations
+    alt requested quantity allocated
+        DB-->>API: CONFIRMED
+    else minimum quantity allocated
+        DB->>DB: Store remaining backfill demand
+        DB-->>API: PARTIALLY_CONFIRMED
+        Worker->>DB: Claim work with SKIP LOCKED
+        Worker->>DB: Add available allocations transactionally
+    else below minimum
+        DB-->>API: Roll back and reject
     end
 ```
 
-The database is the final scheduling authority. Cached or replicated availability must never authorize confirmation.
+- `requested_quantity` is the preferred fleet size.
+- `minimum_quantity` is the smallest acceptable immediate allocation.
+- `remaining_quantity` is derived from requested minus allocated.
+- Backfill is best effort until `fulfillment_deadline`.
+- Worker claims and retries are idempotent.
+- Every added allocation is revalidated by PostgreSQL.
 
-## Scaling alternatives
+## Location continuity
 
-Scale is qualitative: actual limits depend on hardware, query plans, transaction duration, and contention.
+A resource keeps one immutable scheduling owner even when its physical location changes. This keeps its complete allocation timeline under one transactional authority.
 
-| Level | Architecture                             | Constraint model                           | Best fit                              | Main trade-off                          |
-| ----- | ---------------------------------------- | ------------------------------------------ | ------------------------------------- | --------------------------------------- |
-| 1     | One PostgreSQL primary                   | Strong local transaction                   | Small to medium workload              | One write authority                     |
-| 2     | More API instances, cache, read replicas | Strong confirmation; advisory reads        | Read-heavy growth                     | Writes still use the primary            |
-| 3     | Shard by service-centre ownership        | Strong inside one shard                    | Many independent centres              | No cross-shard resources                |
-| 4     | Global scheduling authority              | Strong for resources it owns               | Cross-centre technicians or equipment | Booking coordination is still required  |
-| 5     | Distributed transactions                 | Strong across shards                       | Mandatory atomic cross-shard booking  | Latency, locks, and recovery complexity |
-| 6     | Reservation workflow or saga             | Eventual with holds and compensation       | Large asynchronous workflows          | Pending or failed-later outcomes        |
-| 7     | Distributed SQL                          | Database-dependent distributed consistency | Global strict constraints             | Migration, cost, and hot-key limits     |
+Version-one eligibility is deliberately simple:
 
-### Recommended evolution
+1. The resource has no overlapping allocation.
+2. Its type and attributes satisfy the booking policy.
+3. Its preceding scheduled movement ends at the requested pickup location.
+4. The turnaround interval is sufficient.
+5. Its next allocation remains reachable after the requested return.
 
-```mermaid
-flowchart LR
-    L1[Single primary] --> L2[Horizontal APIs and advisory cache]
-    L2 --> L3[Constraint-owned shards]
-    L3 --> L4[Global authority only if resources cross shards]
-```
+An explicit transfer movement may reposition a resource. Version one does not optimize transfers or routes.
 
-1. Keep one PostgreSQL primary until measurements show a bottleneck.
-2. Scale stateless API instances and cache only advisory availability reads.
-3. Add replicas for reporting and other non-authoritative reads.
-4. If write capacity is exhausted, shard by immutable `service_centre_id` ownership.
-5. Introduce a global scheduler only if constrained resources must cross service centres.
-
-## Sharding constraint
-
-All data participating in one atomic booking constraint must share a transactional owner.
+## Docker services
 
 ```mermaid
 flowchart LR
-    API[Booking API] --> Router[Service-centre router]
-    Router -->|Centres A to M| S1[(Shard 1)]
-    Router -->|Centres N to Z| S2[(Shard 2)]
-    S1 --> R1[Local appointments, technicians, bays, and idempotency]
-    S2 --> R2[Local appointments, technicians, bays, and idempotency]
+    Web[web container] --> API[api container]
+    API --> DB[(database container)]
+    Worker[allocation-worker container] --> DB
+    Migrate[migration container] --> DB
 ```
 
-- Never split one service centre's technicians, bays, and appointments across write shards.
-- Move an entire centre during rebalancing and fence its writes during cutover.
-- Aggregate cross-shard reporting asynchronously.
-- If a resource must span shards, choose a global authority, distributed transaction, reservation workflow, or distributed SQL. Ordinary PostgreSQL locks cannot protect it.
+The API and worker may use the same Go image with different commands. Multiple workers claim distinct pending rows with `FOR UPDATE SKIP LOCKED`. Graceful shutdown commits or rolls back the active transaction before exit.
 
-## Capacity versus traffic
+## Allocation strategy
+
+### Version one: deterministic allocator
+
+1. Filter active resources by requested type and policy.
+2. Remove overlapping or unreachable resources.
+3. Sort by stable policy, initially utilization then identifier.
+4. Lock candidates and allocate up to the requested quantity.
+5. Commit only when at least the minimum quantity is allocated.
+
+Capacity counters alone are insufficient because the system must identify and route individual vehicles.
+
+### Future: OR-Tools adapter
 
 ```mermaid
-flowchart TD
-    Demand[More booking demand] --> Limit{Saturated resource}
-    Limit -->|API or reads| Compute[Scale APIs and cache]
-    Limit -->|Database writes| Data[Optimize, then shard by ownership]
-    Limit -->|Technicians or bays| Capacity[Add capacity or redirect demand]
-    Limit -->|One popular slot| Conflict[Queue, waitlist, or reject]
+flowchart LR
+    Core[Booking core] --> Port[Optimization interface]
+    Simple[Deterministic allocator] --> Port
+    ORTools[Future OR-Tools service] --> Port
+    Port --> Plan[Proposed allocation and movement plan]
+    Plan --> DB[(PostgreSQL validation)]
 ```
 
-More compute does not create appointment capacity. A technician or bay can serve only one overlapping confirmed appointment regardless of the number of API or database nodes.
+OR-Tools may later propose vehicle assignment, transfers, multi-location routing, and rebalancing that minimizes distance, cost, or unmet demand. PostgreSQL still validates every proposal and remains the no-overlap authority. Optimization improves utilization; it does not create physical fleet capacity.
+
+## Scaling
+
+| Stage | Architecture                        | Guarantee                          | Trade-off                                     |
+| ----- | ----------------------------------- | ---------------------------------- | --------------------------------------------- |
+| 1     | One PostgreSQL primary              | Strong local no-overlap constraint | One write authority                           |
+| 2     | Horizontal APIs and workers         | Same database guarantee            | Writes still reach one primary                |
+| 3     | Cache and read replicas             | Confirmation remains authoritative | Cached availability may be stale              |
+| 4     | Shard by immutable scheduling owner | Strong within each owner shard     | One resource must never have multiple writers |
+| 5     | OR-Tools optimization service       | Proposals only; database validates | More runtime and model complexity             |
+
+Scale traffic independently from fleet capacity. More API or worker containers can process more demand, but only additional eligible vehicles or better routing can increase fulfillable bookings.
 
 ## Failure handling and verification
 
-- Return stable conflicts for stale availability, resource contention, and idempotency-key misuse.
-- Bound database connections and allocation retries; use timeouts at every network boundary.
-- Test OIDC validation, customer ownership, idempotent replay, stale caches, and concurrent confirmation.
-- Before sharding, test routing, ownership enforcement, centre migration, and shard failure isolation.
-- Monitor latency, conflicts, retries, database pool saturation, replication lag, and remaining technician/bay capacity.
+- Use idempotency keys for confirmation and worker retries.
+- Return the allocated and remaining quantities explicitly.
+- Expire unfinished backfill at its fulfillment deadline.
+- Test boundary-touching intervals, overlapping allocations, partial allocation, backfill races, worker restarts, and location continuity.
+- Monitor allocation conflicts, partial-fill rate, backfill age, worker retries, database pool saturation, and fleet utilization.
