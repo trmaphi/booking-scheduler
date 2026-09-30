@@ -172,7 +172,7 @@ func TestSchemaHasBookingOverlapConstraintsAndIndexes(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows.Close()
-	for _, name := range []string{"appointments_technician_no_overlap", "appointments_bay_no_overlap"} {
+	for _, name := range []string{"appointments_technician_no_overlap", "appointments_bay_no_overlap", "appointments_vehicle_no_overlap"} {
 		definition := constraints[name]
 		if !strings.Contains(definition, "tstzrange(start_at, end_at, '[)'::text) WITH &&") || !strings.Contains(definition, "status = 'CONFIRMED'::text") {
 			t.Errorf("constraint %s = %q, want confirmed half-open exclusion", name, definition)

@@ -90,7 +90,7 @@ WEB_PORT=3001 API_PORT=8081 POSTGRES_PORT=55433 pnpm stack:smoke
 
 ## REST API
 
-The complete contract and examples are in `api/openapi/booking-api.yaml`. These examples use only the committed fictional fixtures. With the API running, browse the interactive Scalar reference at `http://localhost:8080/docs` or fetch the raw contract from `http://localhost:8080/openapi.yaml`.
+The complete contract and examples are in `api/openapi/booking-api.yaml`. These examples use only the committed fictional fixtures. With the API running, browse the interactive Scalar reference at `http://localhost:8080/api/docs` or fetch the raw contract from `http://localhost:8080/api/openapi.yaml`.
 
 ```sh
 curl --fail http://localhost:8080/api/v1/booking-options

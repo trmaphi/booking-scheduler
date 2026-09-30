@@ -170,6 +170,9 @@ func mapBookingError(ctx context.Context, err error) error {
 		return errors.Join(ctx.Err(), err)
 	}
 	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23P01" && pgErr.ConstraintName == "appointments_vehicle_no_overlap" {
+		return application.ErrResourceConflict
+	}
 	if errors.As(err, &pgErr) && pgErr.Code == "P0001" {
 		switch pgErr.Detail {
 		case "INVALID_REFERENCE":

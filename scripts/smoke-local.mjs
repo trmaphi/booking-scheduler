@@ -32,19 +32,19 @@ async function main() {
   await checkHealth("/api/v1/health/live");
   await checkHealth("/api/v1/health/ready");
 
-  const docsResponse = await get("/docs", apiUrl);
+  const docsResponse = await get("/api/docs", apiUrl);
   const docs = await docsResponse.text();
   assert.match(docs, /@scalar\/api-reference@1\.72\.1/);
-  assert.match(docs, /url: '\/openapi\.yaml'/);
-  console.log("PASS /docs: HTTP 200, Scalar reference configured");
+  assert.match(docs, /url: '\/api\/openapi\.yaml'/);
+  console.log("PASS /api/docs: HTTP 200, Scalar reference configured");
 
-  const contractResponse = await get("/openapi.yaml", apiUrl);
+  const contractResponse = await get("/api/openapi.yaml", apiUrl);
   assert.match(
     contractResponse.headers.get("content-type") || "",
     /^application\/yaml/,
   );
   assert.match(await contractResponse.text(), /^openapi: 3\.1\.0/m);
-  console.log("PASS /openapi.yaml: HTTP 200, OpenAPI contract served");
+  console.log("PASS /api/openapi.yaml: HTTP 200, OpenAPI contract served");
 
   const schema = execFileSync(
     "docker",

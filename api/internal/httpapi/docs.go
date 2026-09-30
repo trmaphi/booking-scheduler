@@ -18,7 +18,7 @@ const scalarReferenceHTML = `<!doctype html>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.72.1"></script>
     <script>
       Scalar.createApiReference('#app', {
-        url: '/openapi.yaml',
+        url: '/api/openapi.yaml',
         theme: 'purple',
         layout: 'modern'
       })

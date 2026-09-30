@@ -49,20 +49,23 @@ func TestConcurrentConfirmRetriesAlternativePairs(t *testing.T) {
 	fixture := newBookingFixture(t)
 	fixture.addQualifiedTechnician(t, randomUUID(t))
 	fixture.addBay(t, randomUUID(t))
+	otherVehicle := fixture.addVehicle(t)
+	commands := []application.ConfirmCommand{fixture.command(), fixture.command()}
+	commands[1].VehicleID = otherVehicle
 	start := make(chan struct{})
 	results := make(chan struct {
 		appointment application.Appointment
 		err         error
 	}, 2)
-	for range 2 {
-		go func() {
+	for _, command := range commands {
+		go func(command application.ConfirmCommand) {
 			<-start
-			appointment, err := fixture.gateway.Confirm(context.Background(), fixture.command())
+			appointment, err := fixture.gateway.Confirm(context.Background(), command)
 			results <- struct {
 				appointment application.Appointment
 				err         error
 			}{appointment.Appointment, err}
-		}()
+		}(command)
 	}
 	close(start)
 	first, second := <-results, <-results

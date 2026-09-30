@@ -81,6 +81,26 @@ func TestLoadAvailabilityContextIsBoundedAndComplete(t *testing.T) {
 	}
 }
 
+func TestAvailabilityExcludesSlotsOverlappingSameVehicle(t *testing.T) {
+	f := newBookingFixture(t)
+	f.addQualifiedTechnician(t, randomUUID(t))
+	f.addBay(t, randomUUID(t))
+	command := f.command()
+	f.insertAppointment(t, f.qualifiedTechnicianID, f.bayID, command.StartAt, command.StartAt.Add(75*60*1e9))
+
+	available, err := application.NewAvailabilityService(NewRepository(f.pool)).AvailableSlots(context.Background(), application.AvailabilityQuery{
+		VehicleID: f.vehicleID, DealershipID: f.dealershipID, ServiceTypeID: f.serviceTypeID, Date: "2031-03-04",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, slot := range available {
+		if slot.Start().Equal(command.StartAt) {
+			t.Fatalf("occupied vehicle slot %s was returned", command.StartAt)
+		}
+	}
+}
+
 func TestLoadAvailabilityContextUsesConstantSetBasedReads(t *testing.T) {
 	f := newBookingFixture(t)
 	for range 8 {

@@ -126,6 +126,20 @@ func TestConfirmRejectsInactiveOrOccupiedResources(t *testing.T) {
 	}
 }
 
+func TestConfirmRejectsOverlappingAppointmentForSameVehicle(t *testing.T) {
+	fixture := newBookingFixture(t)
+	fixture.addQualifiedTechnician(t, randomUUID(t))
+	fixture.addBay(t, randomUUID(t))
+	command := fixture.command()
+	fixture.insertAppointment(t, fixture.qualifiedTechnicianID, fixture.bayID, command.StartAt, command.StartAt.Add(75*time.Minute))
+
+	_, err := fixture.gateway.Confirm(context.Background(), command)
+	if !errors.Is(err, application.ErrResourceConflict) {
+		t.Fatalf("error = %v, want resource conflict", err)
+	}
+	fixture.assertAppointmentCount(t, 1)
+}
+
 func TestConfirmValidatesCommandWithoutDatabaseText(t *testing.T) {
 	fixture := newBookingFixture(t)
 	command := fixture.command()
@@ -285,6 +299,15 @@ func (f *bookingFixture) addInactiveVehicle(t *testing.T) string {
 	t.Helper()
 	id := randomUUID(t)
 	_, err := f.pool.Exec(context.Background(), `insert into vehicles(id,customer_id,label,registration,active) values($1,$2,'Inactive',$3,false)`, id, f.customerID, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+func (f *bookingFixture) addVehicle(t *testing.T) string {
+	t.Helper()
+	id := randomUUID(t)
+	_, err := f.pool.Exec(context.Background(), `insert into vehicles(id,customer_id,label,registration) values($1,$2,'Additional Vehicle',$3)`, id, f.customerID, id)
 	if err != nil {
 		t.Fatal(err)
 	}

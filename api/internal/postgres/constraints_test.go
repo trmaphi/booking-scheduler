@@ -11,14 +11,15 @@ import (
 )
 
 const (
-	constraintCustomerID    = "10000000-0000-0000-0000-000000000001"
-	constraintVehicleID     = "10000000-0000-0000-0000-000000000002"
-	constraintDealershipID  = "10000000-0000-0000-0000-000000000003"
-	constraintServiceTypeID = "10000000-0000-0000-0000-000000000004"
-	constraintTechnicianID  = "10000000-0000-0000-0000-000000000005"
-	constraintOtherTechID   = "10000000-0000-0000-0000-000000000006"
-	constraintBayID         = "10000000-0000-0000-0000-000000000007"
-	constraintOtherBayID    = "10000000-0000-0000-0000-000000000008"
+	constraintCustomerID     = "10000000-0000-0000-0000-000000000001"
+	constraintVehicleID      = "10000000-0000-0000-0000-000000000002"
+	constraintOtherVehicleID = "10000000-0000-0000-0000-000000000009"
+	constraintDealershipID   = "10000000-0000-0000-0000-000000000003"
+	constraintServiceTypeID  = "10000000-0000-0000-0000-000000000004"
+	constraintTechnicianID   = "10000000-0000-0000-0000-000000000005"
+	constraintOtherTechID    = "10000000-0000-0000-0000-000000000006"
+	constraintBayID          = "10000000-0000-0000-0000-000000000007"
+	constraintOtherBayID     = "10000000-0000-0000-0000-000000000008"
 )
 
 func TestAppointmentIntervalIsHalfOpen(t *testing.T) {
@@ -49,7 +50,7 @@ func TestAppointmentOverlapRejectsTechnician(t *testing.T) {
 	start := time.Date(2030, 1, 2, 9, 0, 0, 0, time.UTC)
 	insertConstraintAppointment(t, tx, constraintTechnicianID, constraintBayID, "CONFIRMED", start, start.Add(time.Hour))
 
-	err := insertConstraintAppointmentError(tx, constraintTechnicianID, constraintOtherBayID, "CONFIRMED", start.Add(30*time.Minute), start.Add(90*time.Minute))
+	err := insertConstraintAppointmentForVehicleError(tx, constraintOtherVehicleID, constraintTechnicianID, constraintOtherBayID, "CONFIRMED", start.Add(30*time.Minute), start.Add(90*time.Minute))
 	assertExclusionViolation(t, err, "appointments_technician_no_overlap")
 }
 
@@ -58,8 +59,17 @@ func TestAppointmentOverlapRejectsBay(t *testing.T) {
 	start := time.Date(2030, 1, 2, 9, 0, 0, 0, time.UTC)
 	insertConstraintAppointment(t, tx, constraintTechnicianID, constraintBayID, "CONFIRMED", start, start.Add(time.Hour))
 
-	err := insertConstraintAppointmentError(tx, constraintOtherTechID, constraintBayID, "CONFIRMED", start.Add(30*time.Minute), start.Add(90*time.Minute))
+	err := insertConstraintAppointmentForVehicleError(tx, constraintOtherVehicleID, constraintOtherTechID, constraintBayID, "CONFIRMED", start.Add(30*time.Minute), start.Add(90*time.Minute))
 	assertExclusionViolation(t, err, "appointments_bay_no_overlap")
+}
+
+func TestAppointmentOverlapRejectsVehicle(t *testing.T) {
+	tx := appointmentConstraintTx(t)
+	start := time.Date(2030, 1, 2, 9, 0, 0, 0, time.UTC)
+	insertConstraintAppointment(t, tx, constraintTechnicianID, constraintBayID, "CONFIRMED", start, start.Add(time.Hour))
+
+	err := insertConstraintAppointmentError(tx, constraintOtherTechID, constraintOtherBayID, "CONFIRMED", start.Add(30*time.Minute), start.Add(90*time.Minute))
+	assertExclusionViolation(t, err, "appointments_vehicle_no_overlap")
 }
 
 func TestAppointmentBoundaryTouchingSucceeds(t *testing.T) {
@@ -89,6 +99,7 @@ func appointmentConstraintTx(t *testing.T) pgx.Tx {
 		`insert into customers (id, name, email) values ($1, 'Constraint Customer', 'constraint@example.invalid')`,
 		`insert into dealerships (id, name, address, timezone) values ($1, 'Constraint Centre', '1 Test Way', 'UTC')`,
 		`insert into vehicles (id, customer_id, label, registration) values ($1, $2, 'Test Vehicle', 'TEST-CONSTRAINT')`,
+		`insert into vehicles (id, customer_id, label, registration) values ($1, $2, 'Other Test Vehicle', 'OTHER-CONSTRAINT')`,
 		`insert into service_types (id, name, description, duration_minutes) values ($1, 'Constraint Service', 'Test only', 60)`,
 		`insert into technicians (id, dealership_id, name) values ($1, $2, 'Constraint Technician')`,
 		`insert into technicians (id, dealership_id, name) values ($1, $2, 'Other Constraint Technician')`,
@@ -99,6 +110,7 @@ func appointmentConstraintTx(t *testing.T) pgx.Tx {
 		{constraintCustomerID},
 		{constraintDealershipID},
 		{constraintVehicleID, constraintCustomerID},
+		{constraintOtherVehicleID, constraintCustomerID},
 		{constraintServiceTypeID},
 		{constraintTechnicianID, constraintDealershipID},
 		{constraintOtherTechID, constraintDealershipID},
@@ -121,12 +133,16 @@ func insertConstraintAppointment(t *testing.T, tx pgx.Tx, technicianID, bayID, s
 }
 
 func insertConstraintAppointmentError(tx pgx.Tx, technicianID, bayID, status string, start, end time.Time) error {
+	return insertConstraintAppointmentForVehicleError(tx, constraintVehicleID, technicianID, bayID, status, start, end)
+}
+
+func insertConstraintAppointmentForVehicleError(tx pgx.Tx, vehicleID, technicianID, bayID, status string, start, end time.Time) error {
 	_, err := tx.Exec(context.Background(), `
 		insert into appointments (
 			customer_id, vehicle_id, dealership_id, service_type_id,
 			technician_id, service_bay_id, status, start_at, end_at
 		) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, constraintCustomerID, constraintVehicleID, constraintDealershipID, constraintServiceTypeID, technicianID, bayID, status, start, end)
+	`, constraintCustomerID, vehicleID, constraintDealershipID, constraintServiceTypeID, technicianID, bayID, status, start, end)
 	return err
 }
 

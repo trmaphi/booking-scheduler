@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestQueryPlanUsesBoundedAppointmentIntervalIndex(t *testing.T) {
+func TestQueryPlanUsesBoundedAppointmentIntervalAccess(t *testing.T) {
 	tx := appointmentConstraintTx(t)
 	ctx := context.Background()
 	start := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -30,7 +30,7 @@ func TestQueryPlanUsesBoundedAppointmentIntervalIndex(t *testing.T) {
 		  and status = 'CONFIRMED'
 		  and tstzrange(start_at, end_at, '[)') && tstzrange($2::timestamptz, $3::timestamptz, '[)')
 	`, constraintDealershipID, start.Add(300*time.Hour), start.Add(301*time.Hour))
-	assertPlanUsesIndex(t, plan, "appointments_dealership_interval_idx")
+	assertPlanUsesBoundedIndexAccess(t, plan, "appointments", "tstzrange")
 }
 
 func TestQueryPlanUsesQualificationAndActiveResourceIndexes(t *testing.T) {
