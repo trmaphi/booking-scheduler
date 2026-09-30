@@ -214,14 +214,14 @@ func (r *Repository) LoadAvailabilityContext(ctx context.Context, query applicat
 	rows.Close()
 	result.TechnicianBusy = map[domain.TechnicianID][]domain.Interval{}
 	result.BayBusy = map[domain.BayID][]domain.Interval{}
-	rows, err = r.pool.Query(ctx, `select technician_id::text,service_bay_id::text,start_at,end_at from appointments where dealership_id=$1 and status='CONFIRMED' and start_at<$3 and end_at>$2 order by start_at,id`, query.DealershipID, localStart.UTC(), localEnd.UTC())
+	rows, err = r.pool.Query(ctx, `select vehicle_id::text,technician_id::text,service_bay_id::text,start_at,end_at from appointments where (dealership_id=$1 or vehicle_id=$4) and status='CONFIRMED' and start_at<$3 and end_at>$2 order by start_at,id`, query.DealershipID, localStart.UTC(), localEnd.UTC(), query.VehicleID)
 	if err != nil {
 		return result, mapReadError(ctx, err)
 	}
 	for rows.Next() {
-		var tech, bay string
+		var vehicle, tech, bay string
 		var start, end time.Time
-		if err := rows.Scan(&tech, &bay, &start, &end); err != nil {
+		if err := rows.Scan(&vehicle, &tech, &bay, &start, &end); err != nil {
 			rows.Close()
 			return result, mapReadError(ctx, err)
 		}
@@ -232,6 +232,9 @@ func (r *Repository) LoadAvailabilityContext(ctx context.Context, query applicat
 		}
 		result.TechnicianBusy[domain.TechnicianID(tech)] = append(result.TechnicianBusy[domain.TechnicianID(tech)], interval)
 		result.BayBusy[domain.BayID(bay)] = append(result.BayBusy[domain.BayID(bay)], interval)
+		if vehicle == query.VehicleID {
+			result.VehicleBusy = append(result.VehicleBusy, interval)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()

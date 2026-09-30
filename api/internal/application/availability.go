@@ -46,6 +46,7 @@ type AvailabilityContext struct {
 	RequiredSkills  []domain.SkillID
 	Technicians     []domain.Technician
 	Bays            []domain.Bay
+	VehicleBusy     []domain.Interval
 	TechnicianBusy  map[domain.TechnicianID][]domain.Interval
 	BayBusy         map[domain.BayID][]domain.Interval
 }
@@ -116,7 +117,7 @@ func (s AvailabilityService) AvailableSlots(ctx context.Context, query Availabil
 			if !candidate.Within(businessInterval) {
 				break
 			}
-			if hasFreeTechnician(candidate, technicians, loaded.TechnicianBusy) && hasFreeBay(candidate, bays, loaded.BayBusy) {
+			if isFree(candidate, loaded.VehicleBusy) && hasFreeTechnician(candidate, technicians, loaded.TechnicianBusy) && hasFreeBay(candidate, bays, loaded.BayBusy) {
 				key := candidate.Start().UnixNano()
 				if _, exists := seen[key]; !exists {
 					slots = append(slots, candidate)
