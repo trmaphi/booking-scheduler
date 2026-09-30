@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o
 FROM alpine:3.22 AS runtime
 ARG REVISION=unknown
 LABEL org.opencontainers.image.revision=$REVISION
-RUN apk add --no-cache ca-certificates wget && addgroup -S -g 10001 scheduler && adduser -S -u 10001 -G scheduler scheduler
+RUN apk add --no-cache ca-certificates tzdata wget && addgroup -S -g 10001 scheduler && adduser -S -u 10001 -G scheduler scheduler
 COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=builder /out/migrate /usr/local/bin/migrate
 USER scheduler

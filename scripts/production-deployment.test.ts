@@ -97,3 +97,10 @@ describe("production Compose topology", () => {
     expect(example).not.toMatch(/=(?!\s*(?:#|$)).+/m);
   });
 });
+
+describe("production API image", () => {
+  test("installs timezone data for dealership scheduling", () => {
+    const dockerfile = readFileSync(resolve(root, "api/Dockerfile"), "utf8");
+    expect(dockerfile).toMatch(/apk add --no-cache[^\n]*\btzdata\b/);
+  });
+});
