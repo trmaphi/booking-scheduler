@@ -48,6 +48,8 @@ services:
     logging: *bounded-logging
   web:
     image: "{{ web_image }}:{{ release_tag }}"
+    environment:
+      API_INTERNAL_BASE_URL: http://api:8080
     depends_on:
       api: { condition: service_healthy }
     networks: [app]

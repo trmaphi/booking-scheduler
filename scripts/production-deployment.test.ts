@@ -70,6 +70,19 @@ describe("production Compose topology", () => {
     );
   });
 
+  test.each([
+    "compose.production.yaml",
+    "infra/ansible/roles/application/templates/compose.production.yaml.j2",
+  ])(
+    "connects server-rendered web requests to the internal API in %s",
+    (file) => {
+      const compose = parse(readFileSync(resolve(root, file), "utf8"));
+      expect(compose.services.web.environment.API_INTERNAL_BASE_URL).toBe(
+        "http://api:8080",
+      );
+    },
+  );
+
   test("persists database and Caddy state with bounded logs", () => {
     const compose = topology();
     expect(Object.keys(compose.volumes)).toEqual(

@@ -74,6 +74,8 @@ services:
 
   web:
     image: ${WEB_IMAGE:?WEB_IMAGE is required}:${IMAGE_TAG:?IMAGE_TAG is required}
+    environment:
+      API_INTERNAL_BASE_URL: http://api:8080
     depends_on:
       api: { condition: service_healthy }
     networks: [app]
