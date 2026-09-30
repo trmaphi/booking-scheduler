@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"scheduler/api/internal/application"
 	"scheduler/api/internal/domain"
@@ -137,6 +138,28 @@ func TestAppointmentByIDSurvivesNewConnection(t *testing.T) {
 	if !errors.Is(err, application.ErrNotFound) {
 		t.Fatalf("unknown error=%v", err)
 	}
+}
+
+func TestAppointmentsFiltersStatusAndReturnsCompleteRows(t *testing.T) {
+	f := newBookingFixture(t)
+	start := time.Date(2031, 3, 4, 9, 30, 0, 0, time.UTC)
+	f.insertAppointment(t, f.qualifiedTechnicianID, f.bayID, start, start.Add(75*time.Minute))
+	if _, err := f.pool.Exec(context.Background(), `update appointments set status='CANCELLED' where vehicle_id=$1 and start_at=$2`, f.vehicleID, start); err != nil {
+		t.Fatal(err)
+	}
+	appointments, err := NewRepository(f.pool).Appointments(context.Background(), "CANCELLED")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, appointment := range appointments {
+		if appointment.VehicleID == f.vehicleID {
+			if appointment.Status != "CANCELLED" || appointment.VehicleLabel == "" || appointment.DealershipName == "" || appointment.ServiceTypeName == "" || appointment.TechnicianName == "" || appointment.ServiceBayName == "" {
+				t.Fatalf("incomplete appointment: %#v", appointment)
+			}
+			return
+		}
+	}
+	t.Fatal("cancelled appointment missing")
 }
 
 func hasVehicle(values []application.VehicleOption, id string) bool {

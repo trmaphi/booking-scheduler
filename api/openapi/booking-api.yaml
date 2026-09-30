@@ -150,6 +150,32 @@ paths:
           $ref: "#/components/responses/MethodNotAllowed"
         "500":
           $ref: "#/components/responses/InternalError"
+    get:
+      operationId: listAppointments
+      summary: List booked appointments
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [CONFIRMED, CANCELLED]
+      responses:
+        "200":
+          description: Appointments matching the optional status filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentList"
+              example:
+                appointments:
+                  - *appointmentExample
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /api/v1/appointments/{appointmentId}:
     get:
       operationId: getAppointment
@@ -355,7 +381,7 @@ components:
         ]
       properties:
         id: { $ref: "#/components/schemas/Identifier" }
-        status: { type: string, const: CONFIRMED }
+        status: { type: string, enum: [CONFIRMED, CANCELLED] }
         vehicle: { $ref: "#/components/schemas/Vehicle" }
         dealership: { $ref: "#/components/schemas/Dealership" }
         serviceType: { $ref: "#/components/schemas/ServiceType" }
@@ -365,6 +391,14 @@ components:
           $ref: "#/components/schemas/AssignedResource"
         startAt: { $ref: "#/components/schemas/OffsetDateTime" }
         endAt: { $ref: "#/components/schemas/OffsetDateTime" }
+    AppointmentList:
+      type: object
+      additionalProperties: false
+      required: [appointments]
+      properties:
+        appointments:
+          type: array
+          items: { $ref: "#/components/schemas/Appointment" }
     AssignedResource:
       type: object
       additionalProperties: false

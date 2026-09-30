@@ -110,6 +110,27 @@ describe("appointment page", () => {
     ).toBeVisible();
   });
 
+  it("renders cancelled appointments without calling them confirmed", async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(response({ ...appointment, status: "CANCELLED" }));
+
+    render(
+      await renderAppointmentPage({
+        appointmentId,
+        apiBaseURL: "http://api:8080",
+        fetchImpl,
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Appointment cancelled" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Appointment confirmed" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders a temporary-unavailable state without leaking API details", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

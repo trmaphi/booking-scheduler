@@ -5,6 +5,7 @@ import {
   getAppointment,
   getAvailability,
   getBookingOptions,
+  listAppointments,
 } from "./generated/sdk.gen";
 import {
   BookingApiError,
@@ -82,6 +83,19 @@ export function createBookingApi(
   });
 
   return {
+    async getAppointments(status, signal) {
+      try {
+        const result = await listAppointments({
+          client,
+          query: status ? { status } : undefined,
+          signal,
+          throwOnError: true,
+        });
+        return result.data;
+      } catch (reason) {
+        return mapRequestError(reason, signal);
+      }
+    },
     async getBookingOptions(signal) {
       try {
         const result = await getBookingOptions({

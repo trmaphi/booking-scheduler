@@ -174,4 +174,21 @@ describe("createBookingApi", () => {
       `http://localhost:8080/api/v1/appointments/${appointment.id}`,
     );
   });
+
+  it("lists appointments with an optional status filter", async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ appointments: [appointment] }));
+
+    await expect(
+      createBookingApi("http://localhost:8080", fetchImpl).getAppointments(
+        "CONFIRMED",
+      ),
+    ).resolves.toEqual({ appointments: [appointment] });
+
+    const request = fetchImpl.mock.calls[0]?.[0] as Request;
+    expect(request.url).toBe(
+      "http://localhost:8080/api/v1/appointments?status=CONFIRMED",
+    );
+  });
 });

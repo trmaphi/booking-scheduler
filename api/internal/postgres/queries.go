@@ -263,6 +263,35 @@ func (r *Repository) AppointmentByID(ctx context.Context, id string) (appointmen
 	return appointmentByID(ctx, r.pool, id)
 }
 
+func (r *Repository) Appointments(ctx context.Context, status string) ([]application.Appointment, error) {
+	if r == nil || r.pool == nil {
+		return nil, application.ErrPersistence
+	}
+	if status != "" && status != "CONFIRMED" && status != "CANCELLED" {
+		return nil, application.ErrValidation
+	}
+	rows, err := r.pool.Query(ctx, `select a.id::text,a.customer_id::text,a.vehicle_id::text,a.dealership_id::text,a.service_type_id::text,a.technician_id::text,a.service_bay_id::text,a.status,a.start_at,a.end_at,a.created_at,c.name,v.label,v.registration,d.name,d.address,d.timezone,s.name,s.description,s.duration_minutes,t.name,b.name from appointments a join customers c on c.id=a.customer_id join vehicles v on v.id=a.vehicle_id join dealerships d on d.id=a.dealership_id join service_types s on s.id=a.service_type_id join technicians t on t.id=a.technician_id join service_bays b on b.id=a.service_bay_id where ($1='' or a.status=$1) order by case when a.start_at >= now() then 0 else 1 end, case when a.start_at >= now() then a.start_at end asc, case when a.start_at < now() then a.start_at end desc, a.id`, status)
+	if err != nil {
+		return nil, mapReadError(ctx, err)
+	}
+	defer rows.Close()
+	appointments := []application.Appointment{}
+	for rows.Next() {
+		var a application.Appointment
+		if err := rows.Scan(&a.ID, &a.CustomerID, &a.VehicleID, &a.DealershipID, &a.ServiceTypeID, &a.TechnicianID, &a.ServiceBayID, &a.Status, &a.StartAt, &a.EndAt, &a.CreatedAt, &a.CustomerName, &a.VehicleLabel, &a.Registration, &a.DealershipName, &a.DealershipAddress, &a.DealershipTimeZone, &a.ServiceTypeName, &a.ServiceTypeDescription, &a.ServiceDurationMinutes, &a.TechnicianName, &a.ServiceBayName); err != nil {
+			return nil, mapReadError(ctx, err)
+		}
+		a.StartAt = a.StartAt.UTC()
+		a.EndAt = a.EndAt.UTC()
+		a.CreatedAt = a.CreatedAt.UTC()
+		appointments = append(appointments, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapReadError(ctx, err)
+	}
+	return appointments, nil
+}
+
 func appointmentByID(ctx context.Context, db queryRower, id string) (application.Appointment, error) {
 	var a application.Appointment
 	err := db.QueryRow(ctx, `select a.id::text,a.customer_id::text,a.vehicle_id::text,a.dealership_id::text,a.service_type_id::text,a.technician_id::text,a.service_bay_id::text,a.status,a.start_at,a.end_at,a.created_at,c.name,v.label,v.registration,d.name,d.address,d.timezone,s.name,s.description,s.duration_minutes,t.name,b.name from appointments a join customers c on c.id=a.customer_id join vehicles v on v.id=a.vehicle_id join dealerships d on d.id=a.dealership_id join service_types s on s.id=a.service_type_id join technicians t on t.id=a.technician_id join service_bays b on b.id=a.service_bay_id where a.id=$1`, id).Scan(&a.ID, &a.CustomerID, &a.VehicleID, &a.DealershipID, &a.ServiceTypeID, &a.TechnicianID, &a.ServiceBayID, &a.Status, &a.StartAt, &a.EndAt, &a.CreatedAt, &a.CustomerName, &a.VehicleLabel, &a.Registration, &a.DealershipName, &a.DealershipAddress, &a.DealershipTimeZone, &a.ServiceTypeName, &a.ServiceTypeDescription, &a.ServiceDurationMinutes, &a.TechnicianName, &a.ServiceBayName)

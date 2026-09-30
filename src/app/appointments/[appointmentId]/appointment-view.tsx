@@ -40,16 +40,19 @@ export async function loadAppointment(
 
 function ConfirmedView({ appointment }: { appointment: ConfirmedAppointment }) {
   const { timezone } = appointment.dealership;
+  const cancelled = appointment.status === "CANCELLED";
   return (
     <section className={styles.confirmed}>
       <div className={styles.successMark} aria-hidden="true">
-        ✓
+        {cancelled ? "×" : "✓"}
       </div>
       <p className={styles.eyebrow}>Booking reference {appointment.id}</p>
-      <h1>Appointment confirmed</h1>
+      <h1>Appointment {cancelled ? "cancelled" : "confirmed"}</h1>
       <p className={styles.confirmedLead}>
-        <strong>{appointment.status}</strong> · Your service resources are
-        reserved.
+        <strong>{appointment.status}</strong> ·{" "}
+        {cancelled
+          ? "This booking is no longer active."
+          : "Your service resources are reserved."}
       </p>
       <div className={styles.confirmedGrid}>
         <div>

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { BookingExperience } from "@/features/booking/ui/booking-experience";
 
 export default function Home() {
@@ -7,9 +9,14 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="Service Studio home">
           <span>SS</span> Service Studio
         </a>
-        <span className="secureNote">
-          <i aria-hidden="true" /> Secure booking
-        </span>
+        <div className="topbarActions">
+          <Link className="navLink" href="/appointments">
+            Appointments
+          </Link>
+          <span className="secureNote">
+            <i aria-hidden="true" /> Secure booking
+          </span>
+        </div>
       </nav>
       <div className="hero" id="top">
         <section className="heroCopy">

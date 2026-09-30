@@ -20,6 +20,41 @@ const maxAppointmentBodyBytes int64 = 1 << 20
 
 type confirmAppointmentFunc func(context.Context, application.ConfirmCommand) (application.ConfirmationResult, error)
 type appointmentByIDFunc func(context.Context, string) (application.Appointment, error)
+type appointmentsFunc func(context.Context, string) ([]application.Appointment, error)
+
+func appointmentCollection(list appointmentsFunc, confirm confirmAppointmentFunc, recorder telemetry.Recorder, clock telemetry.Clock) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			status := r.URL.Query().Get("status")
+			if status != "" && status != "CONFIRMED" && status != "CANCELLED" {
+				writeApplicationError(w, r, &application.ValidationError{Field: "status", Reason: "must be CONFIRMED or CANCELLED"})
+				return
+			}
+			if list == nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "an unexpected error occurred", nil)
+				return
+			}
+			appointments, err := list(r.Context(), status)
+			if err != nil {
+				writeApplicationError(w, r, err)
+				return
+			}
+			items := make([]appointmentResponse, len(appointments))
+			for index, appointment := range appointments {
+				items[index] = mapAppointment(appointment)
+			}
+			writeJSON(w, http.StatusOK, struct {
+				Appointments []appointmentResponse `json:"appointments"`
+			}{Appointments: items})
+		case http.MethodPost:
+			confirmAppointment(confirm, recorder, clock).ServeHTTP(w, r)
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			writeAPIError(w, r, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", nil)
+		}
+	})
+}
 
 func confirmAppointment(confirm confirmAppointmentFunc, recorder telemetry.Recorder, clock telemetry.Clock) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

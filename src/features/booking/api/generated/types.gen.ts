@@ -49,7 +49,7 @@ export type ConfirmAppointmentRequest = {
 
 export type Appointment = {
   id: Identifier;
-  status: "CONFIRMED";
+  status: "CONFIRMED" | "CANCELLED";
   vehicle: Vehicle;
   dealership: Dealership;
   serviceType: ServiceType;
@@ -57,6 +57,10 @@ export type Appointment = {
   serviceBay: AssignedResource;
   startAt: OffsetDateTime;
   endAt: OffsetDateTime;
+};
+
+export type AppointmentList = {
+  appointments: Array<Appointment>;
 };
 
 export type AssignedResource = {
@@ -164,6 +168,43 @@ export type GetAvailabilityResponses = {
 
 export type GetAvailabilityResponse =
   GetAvailabilityResponses[keyof GetAvailabilityResponses];
+
+export type ListAppointmentsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    status?: "CONFIRMED" | "CANCELLED";
+  };
+  url: "/api/v1/appointments";
+};
+
+export type ListAppointmentsErrors = {
+  /**
+   * Request validation failed
+   */
+  400: ApiError;
+  /**
+   * The HTTP method is not supported by this resource
+   */
+  405: ApiError;
+  /**
+   * Unexpected server failure
+   */
+  500: ApiError;
+};
+
+export type ListAppointmentsError =
+  ListAppointmentsErrors[keyof ListAppointmentsErrors];
+
+export type ListAppointmentsResponses = {
+  /**
+   * Appointments matching the optional status filter
+   */
+  200: AppointmentList;
+};
+
+export type ListAppointmentsResponse =
+  ListAppointmentsResponses[keyof ListAppointmentsResponses];
 
 export type ConfirmAppointmentData = {
   body: ConfirmAppointmentRequest;

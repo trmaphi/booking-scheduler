@@ -67,6 +67,13 @@ export function mockBookingApi(overrides: MockOverrides = {}): BookingApi {
   const appointments = new Map<string, ConfirmedAppointment>();
 
   const api: BookingApi = {
+    async getAppointments(status) {
+      return {
+        appointments: [...appointments.values()].filter(
+          (appointment) => !status || appointment.status === status,
+        ),
+      };
+    },
     async getBookingOptions() {
       return mockBookingOptions;
     },

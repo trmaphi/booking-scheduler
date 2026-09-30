@@ -34,6 +34,7 @@ describe("booking OpenAPI contract", () => {
       responseContent(api, "/api/v1/availability", "400"),
       responseContent(api, "/api/v1/availability", "405"),
       responseContent(api, "/api/v1/availability", "500"),
+      responseContent(api, "/api/v1/appointments", "200"),
       responseContent(api, "/api/v1/appointments", "201", "post"),
       responseContent(api, "/api/v1/appointments", "200", "post"),
       responseContent(api, "/api/v1/appointments", "409", "post"),

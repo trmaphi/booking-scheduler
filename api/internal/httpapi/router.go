@@ -18,6 +18,7 @@ type Dependencies struct {
 	BookingOptions     func(context.Context) (application.BookingOptions, error)
 	AvailableSlots     func(context.Context, application.AvailabilityQuery) ([]domain.Interval, error)
 	ConfirmAppointment func(context.Context, application.ConfirmCommand) (application.ConfirmationResult, error)
+	Appointments       func(context.Context, string) ([]application.Appointment, error)
 	AppointmentByID    func(context.Context, string) (application.Appointment, error)
 	AllowedOrigin      string
 	Telemetry          telemetry.Recorder
@@ -39,7 +40,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("/api/v1/health/ready", requireMethod(http.MethodGet, ready(deps.Readiness)))
 	mux.Handle("/api/v1/booking-options", requireMethod(http.MethodGet, bookingOptions(deps.BookingOptions)))
 	mux.Handle("/api/v1/availability", requireMethod(http.MethodGet, availability(deps.AvailableSlots, recorder)))
-	mux.Handle("/api/v1/appointments", requireMethod(http.MethodPost, confirmAppointment(deps.ConfirmAppointment, recorder, clock)))
+	mux.Handle("/api/v1/appointments", appointmentCollection(deps.Appointments, deps.ConfirmAppointment, recorder, clock))
 	mux.Handle("/api/v1/appointments/", requireMethod(http.MethodGet, retrieveAppointment(deps.AppointmentByID)))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusNotFound, "NOT_FOUND", "resource not found", nil)

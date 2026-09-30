@@ -26,6 +26,9 @@ import type {
   GetReadinessData,
   GetReadinessErrors,
   GetReadinessResponses,
+  ListAppointmentsData,
+  ListAppointmentsErrors,
+  ListAppointmentsResponses,
 } from "./types.gen";
 
 export type Options<
@@ -77,6 +80,22 @@ export const getAvailability = <ThrowOnError extends boolean = false>(
     GetAvailabilityErrors,
     ThrowOnError
   >({ url: "/api/v1/availability", ...options });
+
+/**
+ * List booked appointments
+ */
+export const listAppointments = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAppointmentsData, ThrowOnError>,
+): RequestResult<
+  ListAppointmentsResponses,
+  ListAppointmentsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAppointmentsResponses,
+    ListAppointmentsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/appointments", ...options });
 
 /**
  * Atomically allocate resources and confirm an appointment

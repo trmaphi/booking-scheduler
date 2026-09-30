@@ -50,7 +50,7 @@ export interface ConfirmAppointmentRequest extends AvailabilityRequest {
 
 export interface ConfirmedAppointment {
   id: Identifier;
-  status: "CONFIRMED";
+  status: "CONFIRMED" | "CANCELLED";
   vehicle: VehicleOption;
   dealership: DealershipOption;
   serviceType: ServiceTypeOption;
@@ -58,6 +58,10 @@ export interface ConfirmedAppointment {
   serviceBay: { id: Identifier; name: string };
   startAt: string;
   endAt: string;
+}
+
+export interface AppointmentListResult {
+  appointments: ConfirmedAppointment[];
 }
 
 export type BookingErrorCode =
@@ -80,6 +84,10 @@ export class BookingApiError extends Error {
 }
 
 export interface BookingApi {
+  getAppointments(
+    status?: ConfirmedAppointment["status"],
+    signal?: AbortSignal,
+  ): Promise<AppointmentListResult>;
   getBookingOptions(signal?: AbortSignal): Promise<BookingOptions>;
   getAvailability(
     request: AvailabilityRequest,

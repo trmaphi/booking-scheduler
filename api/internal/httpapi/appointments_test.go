@@ -205,6 +205,49 @@ func TestRetrieveAppointmentReturnsCompletePersistedContract(t *testing.T) {
 	assertAppointmentResponse(t, response, want)
 }
 
+func TestListAppointmentsReturnsCompleteContractsAndForwardsStatus(t *testing.T) {
+	want := []application.Appointment{completeAppointment()}
+	var gotStatus string
+	router := httpapi.NewRouter(httpapi.Dependencies{Appointments: func(_ context.Context, status string) ([]application.Appointment, error) {
+		gotStatus = status
+		return want, nil
+	}})
+	response := appointmentRequest(router, http.MethodGet, "/api/v1/appointments?status=CONFIRMED", "", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	if gotStatus != "CONFIRMED" {
+		t.Fatalf("status filter = %q", gotStatus)
+	}
+	var payload struct {
+		Appointments []struct {
+			ID string `json:"id"`
+		} `json:"appointments"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Appointments) != 1 || payload.Appointments[0].ID != want[0].ID {
+		t.Fatalf("appointments = %#v", payload.Appointments)
+	}
+}
+
+func TestListAppointmentsRejectsUnknownStatusBeforeGateway(t *testing.T) {
+	called := false
+	router := httpapi.NewRouter(httpapi.Dependencies{Appointments: func(context.Context, string) ([]application.Appointment, error) {
+		called = true
+		return nil, nil
+	}})
+	response := appointmentRequest(router, http.MethodGet, "/api/v1/appointments?status=PENDING", "", "")
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	if called {
+		t.Fatal("gateway called for invalid status")
+	}
+	assertAPIError(t, response, "VALIDATION_ERROR", "status", true)
+}
+
 func TestRetrieveAppointmentValidatesExactPathAndMapsErrors(t *testing.T) {
 	tests := []struct {
 		name, target string

@@ -79,6 +79,7 @@ func newHandlerWithTelemetry(pool *pgxpool.Pool, allowedOrigin string, recorder 
 		BookingOptions:     repository.BookingOptions,
 		AvailableSlots:     availability.AvailableSlots,
 		ConfirmAppointment: repository.Confirm,
+		Appointments:       repository.Appointments,
 		AppointmentByID:    repository.AppointmentByID,
 		AllowedOrigin:      allowedOrigin,
 		Telemetry:          recorder,
